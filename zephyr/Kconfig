@@ -1,0 +1,11 @@
+menu "IQS9151 Driver"
+
+config IQS9151
+    bool "Azoteq IQS9151 touch controller"
+    depends on I2C
+    depends on GPIO
+    default y
+    help
+      Enable driver support for the Azoteq IQS9151 device.
+
+endmenu

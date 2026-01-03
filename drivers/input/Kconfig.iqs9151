@@ -1,0 +1,5 @@
+config IQS9151_INPUT
+    bool "IQS9151 input driver"
+    depends on IQS9151
+    help
+      Input driver for the IQS9151 device.
