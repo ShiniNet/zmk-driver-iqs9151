@@ -11,8 +11,22 @@ menuconfig INPUT_IQS9151
 
 if INPUT_IQS9151
 
-config INPUT_IQS9151_CONF1
-    bool "dummy"
-    default n
+config INPUT_IQS9151_INIT_PRIORITY
+    int "IQS9151 init priority"
+    default 80
+
+config INPUT_IQS9151_THREAD_STACK_SIZE
+    int "IQS9151 IRQ thread stack size"
+    default 1024
+
+config INPUT_IQS9151_THREAD_PRIORITY
+    int "IQS9151 IRQ thread priority"
+    default 1
+
+config INPUT_IQS9151_LOG_LEVEL
+    int "IQS9151 log level"
+    default LOG_LEVEL_INF
+    depends on LOG
+    range 0 4
 
 endif
