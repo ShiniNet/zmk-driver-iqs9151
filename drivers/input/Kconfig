@@ -25,7 +25,7 @@ config INPUT_IQS9151_THREAD_PRIORITY
 
 config INPUT_IQS9151_LOG_LEVEL
     int "IQS9151 log level"
-    default LOG_LEVEL_INF
+    default 4
     depends on LOG
     range 0 4
 
