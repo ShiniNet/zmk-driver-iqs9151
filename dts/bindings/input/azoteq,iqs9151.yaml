@@ -10,13 +10,3 @@ properties:
     required: true
     description: |
       Interrupt GPIO for IQS9151.
-
-  reset-gpios:
-    type: phandle-array
-    required: false
-    description: |
-      Optional reset GPIO.
-
-  label:
-    type: string
-    required: false

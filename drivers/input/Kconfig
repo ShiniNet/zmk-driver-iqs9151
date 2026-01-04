@@ -1,0 +1,18 @@
+
+menuconfig INPUT_IQS9151
+    bool "Azoteq IQS9151 trackpads"
+    default y
+    depends on GPIO
+    depends on I2C
+    depends on INPUT
+    depends on DT_HAS_AZOTEQ_IQS9151_ENABLED
+    help
+      Enable driver for AZOTEQ IQS9151 trackpads
+
+if INPUT_IQS9151
+
+config INPUT_IQS9151_CONF1
+    bool "dummy"
+    default n
+
+endif
