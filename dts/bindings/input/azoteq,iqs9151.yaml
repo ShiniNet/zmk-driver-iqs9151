@@ -10,3 +10,31 @@ properties:
     required: true
     description: |
       Interrupt GPIO for IQS9151.
+
+  reset-gpios:
+    type: phandle-array
+    description: Reset pin
+
+  enable-gpios:
+    type: phandle-array
+    description: Power enable pin
+
+  vdd-supply:
+    type: phandle
+    description: VDD regulator
+
+  vreg-supply:
+    type: phandle
+    description: VREG regulator
+
+  x-resolution:
+    type: int
+    description: X resolution in pixels
+
+  y-resolution:
+    type: int
+    description: Y resolution in pixels
+
+  event-mode:
+    type: boolean
+    description: Enable event-mode communication
