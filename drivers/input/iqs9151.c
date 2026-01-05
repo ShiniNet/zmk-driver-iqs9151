@@ -175,6 +175,20 @@ static const uint8_t iqs9151_snap_enable[] = {
 	SNAPCHANNELENABLE_84, SNAPCHANNELENABLE_85, SNAPCHANNELENABLE_86, SNAPCHANNELENABLE_87,
 };
 
+#define IQS9151_ARRAY_MAX(a, b) ((a) > (b) ? (a) : (b))
+
+#define IQS9151_INIT_MAX_PAYLOAD_LEN \
+	IQS9151_ARRAY_MAX( \
+		IQS9151_ARRAY_MAX( \
+			IQS9151_ARRAY_MAX(ARRAY_SIZE(iqs9151_alp_compensation), \
+					 ARRAY_SIZE(iqs9151_main_config)), \
+			IQS9151_ARRAY_MAX(ARRAY_SIZE(iqs9151_gesture_config), \
+					 ARRAY_SIZE(iqs9151_rxtx_map))), \
+		IQS9151_ARRAY_MAX(ARRAY_SIZE(iqs9151_channel_disable), \
+				 ARRAY_SIZE(iqs9151_snap_enable)))
+
+static uint8_t iqs9151_tx_buf[2 + IQS9151_INIT_MAX_PAYLOAD_LEN];
+
 static int iqs9151_i2c_write(const struct iqs9151_config *config, uint16_t reg,
 			     const uint8_t *buf, size_t len)
 {
@@ -223,25 +237,27 @@ static int iqs9151_write_block(const struct iqs9151_config *config, uint16_t sta
 			       const uint8_t *buf, size_t len)
 {
 	/* block write with base address */
-	uint8_t *tx = k_malloc(len + 2);
 	int ret;
 
-	if (!tx) {
-		return -ENOMEM;
+	if (len > IQS9151_INIT_MAX_PAYLOAD_LEN) {
+		return -EINVAL;
 	}
 
-	sys_put_be16(start, tx);
-	memcpy(&tx[2], buf, len);
+	/*
+	 * If future configuration payloads exceed a single transfer limit (e.g. > 65 bytes),
+	 * split the write into consecutive segments that respect the device's addressing rules.
+	 */
+	sys_put_be16(start, iqs9151_tx_buf);
+	memcpy(&iqs9151_tx_buf[2], buf, len);
 
 	for (int i = 0; i < IQS9151_I2C_MAX_RETRIES; i++) {
-		ret = i2c_write_dt(&config->bus, tx, len + 2);
+		ret = i2c_write_dt(&config->bus, iqs9151_tx_buf, len + 2);
 		if (!ret) {
 			break;
 		}
 		k_msleep(IQS9151_I2C_RETRY_DELAY_MS);
 	}
 
-	k_free(tx);
 	return ret;
 }
 
