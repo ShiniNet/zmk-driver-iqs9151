@@ -564,7 +564,7 @@ static int iqs9151_init(const struct device *dev)
 	.reset_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, reset_gpios, {0}), \
 	.enable_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, enable_gpios, {0}), \
 	}; \
-	INPUT_DEVICE_DT_INST_DEFINE(inst, iqs9151_init, NULL, \
+	DEVICE_DT_INST_DEFINE(inst, iqs9151_init, NULL, \
 				 &iqs9151_data_##inst, &iqs9151_config_##inst, \
 				 POST_KERNEL, CONFIG_INPUT_IQS9151_INIT_PRIORITY, \
 				 NULL);
