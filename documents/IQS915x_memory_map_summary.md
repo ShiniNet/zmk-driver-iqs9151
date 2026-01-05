@@ -186,7 +186,7 @@ This document extracts Section 15 (“I2C Memory Map - Register Descriptions”)
 
 |Bit|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - |
-|Description|Reserved|Palm Gesture|Press-and-Hold|Triple Tap|Double Tap|Single Tap|||
+|Description|Reserved|||Palm Gesture|Press-and-Hold|Triple Tap|Double Tap|Single Tap|||
 
 - Bits 15–8: Swipe and Hold / Swipe directions (0: no gesture, 1: gesture occurred).
 - Bit 4: Palm Gesture (0: none, 1: occurred).
@@ -307,19 +307,19 @@ This document extracts Section 15 (“I2C Memory Map - Register Descriptions”)
 
 |Address|Bit 15|14|13|12|11|10|9|8|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-|0x115C|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x115E|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1160|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1162|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1164|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1166|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1168|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x116A|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x116C|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x116E|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1170|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1172|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
-|0x1174|—|ALP Compensation Divider|ALP Compensation|||||||||||||||
+|0x115C||Rx0 and/or Rx13||||||||||||||||
+|0x115E||Rx1 and/or Rx14||||||||||||||||
+|0x1160||Rx2 and/or Rx15||||||||||||||||
+|0x1162||Rx3 and/or Rx16||||||||||||||||
+|0x1164||Rx4 and/or Rx17||||||||||||||||
+|0x1166||Rx5 and/or Rx18||||||||||||||||
+|0x1168||Rx6 and/or Rx19||||||||||||||||
+|0x116A||Rx7 and/or Rx20||||||||||||||||
+|0x116C||Rx8 and/or Rx21||||||||||||||||
+|0x116E||Rx9 and/or Rx22||||||||||||||||
+|0x1170||Rx10 and/or Rx23|||||||||||||||
+|0x1172||Rx11 and/or Rx24|||||||||||||||
+|0x1174||Rx12 and/or Rx25|||||||||||||||
 
 - Bit 15: unused.
 - Bits 14–10: ALP Compensation Divider.
@@ -329,9 +329,20 @@ This document extracts Section 15 (“I2C Memory Map - Register Descriptions”)
 
 |Address|Bit 15|14|13|12|11|10|9|8|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - | - |
-|0x117A|Fine Mult|Fine Divider|Coarse Multiplier|Coarse Divider|||||||||||||
-|0x117C|Fine Mult|Fine Divider|Coarse Multiplier|Coarse Divider|||||||||||||
-|0x117E–0x1194|Fine Mult|Fine Divider|Coarse Multiplier|Coarse Divider|||||||||||||
+|0x117A|Trackpad||||||||||||||||
+|0x117C|ALP Rx0 + Rx13||||||||||||||||
+|0x117E|ALP Rx1 + Rx14||||||||||||||||
+|0x1180|ALP Rx2 + Rx15||||||||||||||||
+|0x1182|ALP Rx3 + Rx16||||||||||||||||
+|0x1184|ALP Rx4 + Rx17||||||||||||||||
+|0x1186|ALP Rx5 + Rx18||||||||||||||||
+|0x1188|ALP Rx6 + Rx19||||||||||||||||
+|0x118A|ALP Rx7 + Rx20||||||||||||||||
+|0x118C|ALP Rx8 + Rx21||||||||||||||||
+|0x118E|ALP Rx9 + Rx22||||||||||||||||
+|0x1190|ALP Rx10 + Rx23||||||||||||||||
+|0x1192|ALP Rx11 + Rx24||||||||||||||||
+|0x1194|ALP Rx12 + Rx25||||||||||||||||
 
 - Bits 15–14: Fine Multiplier (2-bit, 1–2, recommended 1).
 - Bits 13–9: Fine Divider (5-bit, 1–21, recommended >6).
@@ -342,7 +353,7 @@ This document extracts Section 15 (“I2C Memory Map - Register Descriptions”)
 
 |Bit|15|14|13|12|11|10|9|8|
 | - | - | - | - | - | - | - | - | - |
-|Description|Tx Short Test|Reserved|Suspend|Reserved|SW Reset|Reserved|||
+|Description|Tx Short Test|Reserved|||Suspend|Reserved|SW Reset|Reserved|||
 
 |Bit|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - |
@@ -382,11 +393,11 @@ This document extracts Section 15 (“I2C Memory Map - Register Descriptions”)
 
 |Bit|15|14|13|12|11|10|9|8|
 | - | - | - | - | - | - | - | - | - |
-|Description|Switch Enable|Switch Polarity|Prox Oscillator Adjustment|Reserved|||||
+|Description|Switch Enable|Switch Polarity|Prox Oscillator Adjustment||Reserved|||||
 
 |Bit|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - |
-|Description|Main Oscillator Selection|LP2 Auto-Prox Enable|LP1 Auto-Prox Enable|LP2 Auto-Prox Cycles|LP1 Auto-Prox Cycles|||||
+|Description|Main Oscillator Selection||LP2 Auto-Prox Enable|LP1 Auto-Prox Enable|LP2 Auto-Prox Cycles||LP1 Auto-Prox Cycles|||||
 
 - Bit 15: Switch Enable (0 disabled, 1 enabled).
 - Bit 14: Switch Polarity (0 active-low, 1 active-high).
@@ -444,7 +455,7 @@ This document extracts Section 15 (“I2C Memory Map - Register Descriptions”)
 
 |Bit|15|14|13|12|11|10|9|8|
 | - | - | - | - | - | - | - | - | - |
-|Description|Initial Cycle Delay|SH Bias|Count Upper Limit||||||
+|Description|Initial Cycle Delay||SH Bias|||Count Upper Limit||||||
 
 |Bit|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - |
@@ -499,7 +510,7 @@ Same bit layout as A.3; bits enable (1) or disable (0) each gesture (bits 7–0)
 
 |Bit|15|14|13|12|11|10|9|8|
 | - | - | - | - | - | - | - | - | - |
-|Description|Number of Wheels|Number of Sliders|||||||
+|Description|Number of Wheels||||Number of Sliders||||
 
 |Bit|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - |
@@ -511,11 +522,11 @@ Same bit layout as A.3; bits enable (1) or disable (0) each gesture (bits 7–0)
 
 |Bit|15|14|13|12|11|10|9|8|
 | - | - | - | - | - | - | - | - | - |
-|Description|Reserved|Main Osc Status|Reserved||||||
+|Description|Reserved|||||Main Osc Status||Reserved|
 
 |Bit|7|6|5|4|3|2|1|0|
 | - | - | - | - | - | - | - | - | - |
-|Description|Reserved|Main Osc Stepping Enable|||||||
+|Description|Reserved|||||||Main Osc Stepping Enable|
 
 - Bit 0 enables main oscillator stepping; bits 15–11 and 8–1 are unused; bits 10–9 report main oscillator status.
 
