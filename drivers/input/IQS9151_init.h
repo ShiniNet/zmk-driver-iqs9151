@@ -39,8 +39,8 @@
 
 /* I2C Slave Address */
 /* Memory Map Position 0x1176 - 0x1177 */
-#define I2C_KEY                                  0xFF
-#define I2C_SLAVE_ADR                            0xFF
+#define I2C_KEY                                  0x00
+#define I2C_SLAVE_ADR                            0x56
 
 /* Settings Version Numbers */
 /* Memory Map Position 0x1178 - 0x1179 */
