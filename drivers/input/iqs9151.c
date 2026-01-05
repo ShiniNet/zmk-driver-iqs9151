@@ -15,6 +15,7 @@
 #include "iqs9151_init.h"
 #include "iqs9151_regs.h"
 
+/* Use generic input log level; no driver-specific Kconfig is required. */
 LOG_MODULE_REGISTER(input_iqs9151, CONFIG_INPUT_LOG_LEVEL);
 
 #define IQS9151_MAX_FINGERS             7
