@@ -28,8 +28,6 @@ struct iqs9151_config {
 	struct gpio_dt_spec irq_gpio;
 	struct gpio_dt_spec reset_gpio;
 	struct gpio_dt_spec enable_gpio;
-	uint16_t x_resolution;
-	uint16_t y_resolution;
 };
 
 struct iqs9151_data {
@@ -51,6 +49,9 @@ static const uint8_t iqs9151_alp_compensation[] = {
 	ALP_COMPENSATION_RX12_0, ALP_COMPENSATION_RX12_1,
 };
 
+/* The driver reports relative movement, so the X/Y resolution entries
+ * in the init sequence are unused and left at their default values.
+ */
 static const uint8_t iqs9151_main_config[] = {
 	MINOR_VERSION, MAJOR_VERSION,
 	TP_ATI_MULTDIV_L, TP_ATI_MULTDIV_H,
@@ -557,12 +558,10 @@ static const struct input_device_api iqs9151_api = {
 #define IQS9151_DEFINE(inst) \
 	static struct iqs9151_data iqs9151_data_##inst; \
 	static const struct iqs9151_config iqs9151_config_##inst = { \
-		.bus = I2C_DT_SPEC_INST_GET(inst), \
-		.irq_gpio = GPIO_DT_SPEC_INST_GET(inst, irq_gpios), \
-		.reset_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, reset_gpios, {0}), \
-		.enable_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, enable_gpios, {0}), \
-		.x_resolution = DT_INST_PROP_OR(inst, x_resolution, 0), \
-		.y_resolution = DT_INST_PROP_OR(inst, y_resolution, 0), \
+	.bus = I2C_DT_SPEC_INST_GET(inst), \
+	.irq_gpio = GPIO_DT_SPEC_INST_GET(inst, irq_gpios), \
+	.reset_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, reset_gpios, {0}), \
+	.enable_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, enable_gpios, {0}), \
 	}; \
 	INPUT_DEVICE_DT_INST_DEFINE(inst, iqs9151_init, NULL, \
 				 &iqs9151_data_##inst, &iqs9151_config_##inst, \
