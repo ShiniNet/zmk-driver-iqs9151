@@ -30,7 +30,6 @@ struct iqs9151_config {
 	struct gpio_dt_spec enable_gpio;
 	uint16_t x_resolution;
 	uint16_t y_resolution;
-	bool event_mode;
 };
 
 struct iqs9151_data {
@@ -359,9 +358,8 @@ static int iqs9151_configure(const struct device *dev)
 		return ret;
 	}
 
-	if (config->event_mode) {
-		cfg_settings[0] |= (uint8_t)(IQS9151_CFG_EVENT_MODE >> 8);
-	}
+	/* The driver is interrupt-driven, so keep the RDY line event-driven as well. */
+	cfg_settings[0] |= (uint8_t)(IQS9151_CFG_EVENT_MODE >> 8);
 
 	ret = iqs9151_i2c_write(config, IQS9151_ADDR_CONFIG_SETTINGS, cfg_settings,
 				sizeof(cfg_settings));
@@ -565,7 +563,6 @@ static const struct input_device_api iqs9151_api = {
 		.enable_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, enable_gpios, {0}), \
 		.x_resolution = DT_INST_PROP_OR(inst, x_resolution, 0), \
 		.y_resolution = DT_INST_PROP_OR(inst, y_resolution, 0), \
-		.event_mode = DT_INST_PROP_OR(inst, event_mode, false), \
 	}; \
 	INPUT_DEVICE_DT_INST_DEFINE(inst, iqs9151_init, NULL, \
 				 &iqs9151_data_##inst, &iqs9151_config_##inst, \

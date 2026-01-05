@@ -1,4 +1,8 @@
-description: Azoteq IQS9151 capacitive touch controller
+description: |
+  Azoteq IQS9151 capacitive touch controller.
+
+  The driver configures the controller for event-mode communication and uses the
+  interrupt line for data-ready signaling.
 
 compatible: "azoteq,iqs9151"
 
@@ -34,7 +38,3 @@ properties:
   y-resolution:
     type: int
     description: Y resolution in pixels
-
-  event-mode:
-    type: boolean
-    description: Enable event-mode communication
