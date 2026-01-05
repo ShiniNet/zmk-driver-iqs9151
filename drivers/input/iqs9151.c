@@ -18,6 +18,9 @@
 /* Use generic input log level; no driver-specific Kconfig is required. */
 LOG_MODULE_REGISTER(input_iqs9151, CONFIG_INPUT_LOG_LEVEL);
 
+#define DT_DRV_COMPAT azoteq_iqs9151
+
+
 #define IQS9151_MAX_FINGERS             7
 #define IQS9151_I2C_MAX_RETRIES         3
 #define IQS9151_I2C_RETRY_DELAY_MS      2
@@ -76,7 +79,7 @@ static const uint8_t iqs9151_main_config[] = {
 	IDLE_MODE_TIMEOUT_0, IDLE_MODE_TIMEOUT_1,
 	LP1_MODE_TIMEOUT_0, LP1_MODE_TIMEOUT_1,
 	ACTIVE_MODE_TIMEOUT_0, ACTIVE_MODE_TIMEOUT_1,
-	TREATI_RETRY_TIME, REF_UPDATE_TIME,
+	REATI_RETRY_TIME, REF_UPDATE_TIME,
 	I2C_TIMEOUT_0, I2C_TIMEOUT_1, SNAP_TIMEOUT, OPEN_TIMING,
 	SYSTEM_CONTROL_0, SYSTEM_CONTROL_1, CONFIG_SETTINGS_0, CONFIG_SETTINGS_1,
 	OTHER_SETTINGS_0, OTHER_SETTINGS_1,
@@ -399,8 +402,7 @@ static void iqs9151_report_coords(const struct device *dev, int16_t dx, int16_t 
 		input_report_key(dev, INPUT_BTN_TOUCH, touch_active, false, K_NO_WAIT);
 		data->touch_down = touch_active;
 	}
-	input_report_key(dev, INPUT_BTN_TOOL_FINGER, fingers > 0, false, K_NO_WAIT);
-	input_sync(dev, K_NO_WAIT);
+	input_report_key(dev, INPUT_BTN_TOUCH, fingers > 0, true, K_NO_WAIT);
 }
 
 static int iqs9151_read_irq_data(const struct device *dev)
@@ -553,8 +555,6 @@ static int iqs9151_init(const struct device *dev)
 	return iqs9151_configure(dev);
 }
 
-static const struct input_device_api iqs9151_api = {
-};
 
 #define IQS9151_DEFINE(inst) \
 	static struct iqs9151_data iqs9151_data_##inst; \
@@ -567,6 +567,6 @@ static const struct input_device_api iqs9151_api = {
 	INPUT_DEVICE_DT_INST_DEFINE(inst, iqs9151_init, NULL, \
 				 &iqs9151_data_##inst, &iqs9151_config_##inst, \
 				 POST_KERNEL, CONFIG_INPUT_IQS9151_INIT_PRIORITY, \
-				 &iqs9151_api);
+				 NULL);
 
 DT_INST_FOREACH_STATUS_OKAY(IQS9151_DEFINE)
