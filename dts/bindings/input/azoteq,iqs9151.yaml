@@ -30,11 +30,3 @@ properties:
   vreg-supply:
     type: phandle
     description: VREG regulator
-
-  x-resolution:
-    type: int
-    description: X resolution in pixels
-
-  y-resolution:
-    type: int
-    description: Y resolution in pixels
