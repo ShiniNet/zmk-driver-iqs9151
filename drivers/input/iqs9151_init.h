@@ -1,7 +1,7 @@
 /*
 * This file contains all the necessary settings for the IQS9151.
 * It can be changed from the GUI or edited here.
-* File:   IQS9151_init.h
+* File:   iqs9151_init.h
 * Author: Azoteq
 */ 
 
