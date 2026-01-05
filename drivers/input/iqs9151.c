@@ -40,6 +40,8 @@ struct iqs9151_data {
 	bool touch_down;
 };
 
+#define IQS9151_TWO_FINGER_GESTURES_OFFSET (IQS9151_ADDR_TWO_FINGER_GESTURES - IQS9151_COORD_BLOCK_START)
+
 static const uint8_t iqs9151_alp_compensation[] = {
 	ALP_COMPENSATION_RX0_0, ALP_COMPENSATION_RX0_1, ALP_COMPENSATION_RX1_0, ALP_COMPENSATION_RX1_1,
 	ALP_COMPENSATION_RX2_0, ALP_COMPENSATION_RX2_1, ALP_COMPENSATION_RX3_0, ALP_COMPENSATION_RX3_1,
@@ -384,15 +386,18 @@ static int iqs9151_configure(const struct device *dev)
 }
 
 static void iqs9151_report_coords(const struct device *dev, int16_t dx, int16_t dy,
-				  bool pressed, uint8_t fingers)
+				  bool left_click, bool right_click, uint8_t fingers)
 {
 	struct iqs9151_data *data = dev->data;
+	bool touch_active = left_click || right_click;
 
 	input_report_rel(dev, INPUT_REL_X, dx, false, K_NO_WAIT);
 	input_report_rel(dev, INPUT_REL_Y, dy, false, K_NO_WAIT);
-	if (pressed != data->touch_down) {
-		input_report_key(dev, INPUT_BTN_TOUCH, pressed, false, K_NO_WAIT);
-		data->touch_down = pressed;
+	input_report_key(dev, INPUT_BTN_0, left_click, false, K_NO_WAIT);
+	input_report_key(dev, INPUT_BTN_1, right_click, false, K_NO_WAIT);
+	if (touch_active != data->touch_down) {
+		input_report_key(dev, INPUT_BTN_TOUCH, touch_active, false, K_NO_WAIT);
+		data->touch_down = touch_active;
 	}
 	input_report_key(dev, INPUT_BTN_TOOL_FINGER, fingers > 0, false, K_NO_WAIT);
 	input_sync(dev, K_NO_WAIT);
@@ -429,9 +434,13 @@ static int iqs9151_read_irq_data(const struct device *dev)
 	int16_t rel_x = (int16_t)sys_get_be16(&coord[0]);
 	int16_t rel_y = (int16_t)sys_get_be16(&coord[2]);
 	uint8_t fingers = flags & IQS9151_TP_FINGER_COUNT_MASK;
+	uint16_t two_finger_gestures =
+		sys_get_be16(&coord[IQS9151_TWO_FINGER_GESTURES_OFFSET]);
 	bool pressed = (info & IQS9151_INFO_GLOBAL_TP_TOUCH) || fingers;
+	bool right_click = pressed && (fingers > 1 || two_finger_gestures != 0);
+	bool left_click = pressed && !right_click;
 
-	iqs9151_report_coords(dev, rel_x, rel_y, pressed, fingers);
+	iqs9151_report_coords(dev, rel_x, rel_y, left_click, right_click, fingers);
 
 	return 0;
 }
