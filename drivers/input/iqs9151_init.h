@@ -1,7 +1,7 @@
 /*
 * This file contains all the necessary settings for the IQS9151.
 * It can be changed from the GUI or edited here.
-* File:   iqs9151_init.h
+* File:   IQS9151_init.h
 * Author: Azoteq
 */ 
 
@@ -10,36 +10,36 @@
 
 /* ALP ATI Compensation */
 /* Memory Map Position 0x115C - 0x1175 */
-#define ALP_COMPENSATION_RX0_0                   0x00
-#define ALP_COMPENSATION_RX0_1                   0x00
-#define ALP_COMPENSATION_RX1_0                   0x00
-#define ALP_COMPENSATION_RX1_1                   0x00
-#define ALP_COMPENSATION_RX2_0                   0x00
-#define ALP_COMPENSATION_RX2_1                   0x00
-#define ALP_COMPENSATION_RX3_0                   0x00
-#define ALP_COMPENSATION_RX3_1                   0x00
-#define ALP_COMPENSATION_RX4_0                   0x00
-#define ALP_COMPENSATION_RX4_1                   0x00
-#define ALP_COMPENSATION_RX5_0                   0x00
-#define ALP_COMPENSATION_RX5_1                   0x00
-#define ALP_COMPENSATION_RX6_0                   0x00
-#define ALP_COMPENSATION_RX6_1                   0x00
-#define ALP_COMPENSATION_RX7_0                   0x00
-#define ALP_COMPENSATION_RX7_1                   0x00
-#define ALP_COMPENSATION_RX8_0                   0x00
-#define ALP_COMPENSATION_RX8_1                   0x00
-#define ALP_COMPENSATION_RX9_0                   0x00
-#define ALP_COMPENSATION_RX9_1                   0x00
-#define ALP_COMPENSATION_RX10_0                  0x00
-#define ALP_COMPENSATION_RX10_1                  0x00
-#define ALP_COMPENSATION_RX11_0                  0x00
-#define ALP_COMPENSATION_RX11_1                  0x00
-#define ALP_COMPENSATION_RX12_0                  0x00
-#define ALP_COMPENSATION_RX12_1                  0x00
+#define ALP_COMPENSATION_RX0_0                   0xB4
+#define ALP_COMPENSATION_RX0_1                   0x12
+#define ALP_COMPENSATION_RX1_0                   0xAC
+#define ALP_COMPENSATION_RX1_1                   0x12
+#define ALP_COMPENSATION_RX2_0                   0xB2
+#define ALP_COMPENSATION_RX2_1                   0x12
+#define ALP_COMPENSATION_RX3_0                   0xBF
+#define ALP_COMPENSATION_RX3_1                   0x12
+#define ALP_COMPENSATION_RX4_0                   0xC5
+#define ALP_COMPENSATION_RX4_1                   0x12
+#define ALP_COMPENSATION_RX5_0                   0xB8
+#define ALP_COMPENSATION_RX5_1                   0x12
+#define ALP_COMPENSATION_RX6_0                   0xD7
+#define ALP_COMPENSATION_RX6_1                   0x12
+#define ALP_COMPENSATION_RX7_0                   0xC0
+#define ALP_COMPENSATION_RX7_1                   0x12
+#define ALP_COMPENSATION_RX8_0                   0xA7
+#define ALP_COMPENSATION_RX8_1                   0x12
+#define ALP_COMPENSATION_RX9_0                   0xD1
+#define ALP_COMPENSATION_RX9_1                   0x12
+#define ALP_COMPENSATION_RX10_0                  0xA4
+#define ALP_COMPENSATION_RX10_1                  0x12
+#define ALP_COMPENSATION_RX11_0                  0xB6
+#define ALP_COMPENSATION_RX11_1                  0x12
+#define ALP_COMPENSATION_RX12_0                  0xA1
+#define ALP_COMPENSATION_RX12_1                  0x12
 
 /* I2C Slave Address */
 /* Memory Map Position 0x1176 - 0x1177 */
-#define I2C_KEY                                  0x00
+#define I2C_KEY                                  0xFF
 #define I2C_SLAVE_ADR                            0x56
 
 /* Settings Version Numbers */
@@ -54,7 +54,7 @@
 #define ALP_ATI_COARSE_RX0_L                     0x04
 #define ALP_ATI_COARSE_RX0_H                     0x5F
 #define ALP_ATI_COARSE_RX1_L                     0x04
-#define ALP_ATI_COARSE_RX1_H                     0x5D
+#define ALP_ATI_COARSE_RX1_H                     0x5F
 #define ALP_ATI_COARSE_RX2_L                     0x04
 #define ALP_ATI_COARSE_RX2_H                     0x5D
 #define ALP_ATI_COARSE_RX3_L                     0x04
@@ -68,7 +68,7 @@
 #define ALP_ATI_COARSE_RX7_L                     0x04
 #define ALP_ATI_COARSE_RX7_H                     0x5F
 #define ALP_ATI_COARSE_RX8_L                     0x04
-#define ALP_ATI_COARSE_RX8_H                     0x5D
+#define ALP_ATI_COARSE_RX8_H                     0x5F
 #define ALP_ATI_COARSE_RX9_L                     0x04
 #define ALP_ATI_COARSE_RX9_H                     0x5B
 #define ALP_ATI_COARSE_RX10_L                    0x04
@@ -76,7 +76,7 @@
 #define ALP_ATI_COARSE_RX11_L                    0x04
 #define ALP_ATI_COARSE_RX11_H                    0x5D
 #define ALP_ATI_COARSE_RX12_L                    0x04
-#define ALP_ATI_COARSE_RX12_H                    0x5D
+#define ALP_ATI_COARSE_RX12_H                    0x5F
 
 /* ATI Settings */
 /* Memory Map Position 0x1196 - 0x11A1 */
@@ -124,7 +124,7 @@
 
 /* System Settings */
 /* Memory Map Position 0x11BC - 0x11C1 */
-#define SYSTEM_CONTROL_0                         0x40
+#define SYSTEM_CONTROL_0                         0x00
 #define SYSTEM_CONTROL_1                         0x00
 #define CONFIG_SETTINGS_0                        0x1E
 #define CONFIG_SETTINGS_1                        0x06
@@ -177,30 +177,30 @@
 
 /* Trackpad Settings */
 /* Memory Map Position 0x11E2 - 0x11F5 */
-#define TRACKPAD_SETTINGS_0_0                    0x28
+#define TRACKPAD_SETTINGS_0_0                    0x28 // 0x28
 #define TRACKPAD_SETTINGS_0_1                    0x0D
 #define TRACKPAD_SETTINGS_1_0                    0x0C
 #define TRACKPAD_SETTINGS_1_1                    0x03
-#define X_RESOLUTION_0                           0x14
-#define X_RESOLUTION_1                           0x05
-#define Y_RESOLUTION_0                           0xA8
-#define Y_RESOLUTION_1                           0x04
-#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_0         0x05
-#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_1         0x00
-#define XY_DYNAMIC_FILTER_TOP_SPEED_0            0x2C
-#define XY_DYNAMIC_FILTER_TOP_SPEED_1            0x01
-#define XY_DYNAMIC_FILTER_BOTTOM_BETA            0x01
-#define XY_DYNAMIC_FILTER_STATIC_FILTER_BETA     0x80
+#define X_RESOLUTION_0                           0x00
+#define X_RESOLUTION_1                           0x0C
+#define Y_RESOLUTION_0                           0x01
+#define Y_RESOLUTION_1                           0x0B
+#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_0         0x35 // 0x05
+#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_1         0x00 // 0x00 
+#define XY_DYNAMIC_FILTER_TOP_SPEED_0            0x2C // 0x2C
+#define XY_DYNAMIC_FILTER_TOP_SPEED_1            0x21 // 0x01
+#define XY_DYNAMIC_FILTER_BOTTOM_BETA            0x10 //0x10
+#define XY_DYNAMIC_FILTER_STATIC_FILTER_BETA     0x10 //0x80
 #define STATIONARY_TOUCH_MOV_THRESHOLD           0x14
 #define FINGER_SPLIT_FACTOR                      0x03
 #define X_TRIM_VALUE                             0x14
 #define Y_TRIM_VALUE                             0x14
-#define JITTER_FILTER_DELTA                      0x02
+#define JITTER_FILTER_DELTA                      0x01 //0x02
 #define FINGER_CONFIDENCE_THRESHOLD              0x14
 
 /* Gesture Settings */
 /* Memory Map Position 0x11F6 - 0x1217 */
-#define GESTURE_ENABLE_0                         0x1F
+#define GESTURE_ENABLE_0                         0x19
 #define GESTURE_ENABLE_1                         0xFF
 #define GESTURE_ENABLE_2F_0                      0xFF
 #define GESTURE_ENABLE_2F_1                      0x00

@@ -1,8 +1,5 @@
 description: |
-  Azoteq IQS9151 capacitive touch controller.
-
-  The driver configures the controller for event-mode communication and uses the
-  interrupt line for data-ready signaling.
+  Azoteq IQS9151 driver placeholder.
 
 compatible: "azoteq,iqs9151"
 
@@ -12,21 +9,9 @@ properties:
   irq-gpios:
     type: phandle-array
     required: true
-    description: |
-      Interrupt GPIO for IQS9151.
+    description: Interrupt GPIO for IQS9151 driver.
 
   reset-gpios:
     type: phandle-array
+    required: true
     description: Reset pin
-
-  enable-gpios:
-    type: phandle-array
-    description: Power enable pin
-
-  vdd-supply:
-    type: phandle
-    description: VDD regulator
-
-  vreg-supply:
-    type: phandle
-    description: VREG regulator

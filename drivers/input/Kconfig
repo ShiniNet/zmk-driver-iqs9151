@@ -1,21 +1,19 @@
-
 menuconfig INPUT_IQS9151
-	bool "Azoteq IQS9151 trackpads"
-	default y
-	depends on GPIO
-	depends on I2C
-	depends on INPUT
-	depends on DT_HAS_AZOTEQ_IQS9151_ENABLED
-	help
-	  Enable driver for AZOTEQ IQS9151 trackpads. Logging follows the
-	  generic input log level.
+    bool "Azoteq IQS9151 driver"
+    default y
+    depends on GPIO
+    depends on I2C
+    depends on INPUT
+    depends on DT_HAS_AZOTEQ_IQS9151_ENABLED
+    help
+      Enable the AZOTEQ IQS9151 trackpad driver.
 
 if INPUT_IQS9151
 
 config INPUT_IQS9151_INIT_PRIORITY
-	int "IQS9151 init priority"
-	default 80
-	help
-	  Define the initialization priority for the IQS9151 driver.
+    int "IQS9151 init priority"
+    default 80
+    help
+      Define the initialization priority for the IQS9151 driver.
 
 endif

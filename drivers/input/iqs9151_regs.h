@@ -13,6 +13,7 @@
 #define IQS9151_ADDR_PRODUCT_NUMBER            0x1000
 #define IQS9151_ADDR_RELATIVE_X                0x1014
 #define IQS9151_ADDR_RELATIVE_Y                0x1016
+#define IQS9151_INFO_FLAGS                     0x1020
 #define IQS9151_ADDR_SINGLE_GESTURES           0x101C
 #define IQS9151_ADDR_TWO_FINGER_GESTURES       0x101E
 #define IQS9151_ADDR_INFO_FLAGS                0x1020
