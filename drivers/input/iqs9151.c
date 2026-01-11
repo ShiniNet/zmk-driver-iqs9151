@@ -15,6 +15,7 @@
 #include "iqs9151_init.h"
 #include "iqs9151_regs.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -36,12 +37,15 @@ struct iqs9151_frame {
     uint16_t info_flags;
     uint16_t trackpad_flags;
     uint8_t finger_count;
+    uint16_t finger1_x;
+    uint16_t finger1_y;
 };
 struct iqs9151_data {
     const struct device *dev;
     struct gpio_callback gpio_cb;
     struct k_work work;
     struct iqs9151_frame prev_frame;
+    bool prev_finger1_valid;
 };
 
 #define IQS9151_I2C_CHUNK_SIZE 30
@@ -319,19 +323,6 @@ static int iqs9151_i2c_read(const struct iqs9151_config *cfg, uint16_t reg, uint
     return i2c_write_read_dt(&cfg->bus, addr_buf, sizeof(addr_buf), buf, len);
 }
 
-static void iqs9151_parse_frame(const uint8_t *raw, struct iqs9151_frame *frame) {
-    frame->rel_x = (int16_t)sys_get_le16(&raw[0]);
-    frame->rel_y = (int16_t)sys_get_le16(&raw[2]);
-    frame->gesture_x = (int16_t)sys_get_le16(&raw[4]);
-    frame->gesture_y = (int16_t)sys_get_le16(&raw[6]);
-    frame->single_gestures = sys_get_le16(&raw[8]);
-    frame->two_finger_gestures = sys_get_le16(&raw[10]);
-    frame->info_flags = sys_get_le16(&raw[12]);
-    frame->trackpad_flags = sys_get_le16(&raw[14]);
-    frame->finger_count =
-        (uint8_t)(frame->trackpad_flags & IQS9151_TP_FINGER_COUNT_MASK);
-}
-
 static void iqs9151_wait_for_ready(const struct device *dev, uint16_t timeout_ms) {
     const struct iqs9151_config *cfg = dev->config;
     uint16_t elapsed = 0;
@@ -385,15 +376,55 @@ static int checkProductNumber(const struct device *dev) {
     return ret;
 }
 
+static void iqs9151_parse_frame(const uint8_t *raw, struct iqs9151_frame *frame) {
+    frame->rel_x = (int16_t)sys_get_le16(&raw[0]);
+    frame->rel_y = (int16_t)sys_get_le16(&raw[2]);
+    frame->gesture_x = (int16_t)sys_get_le16(&raw[4]);
+    frame->gesture_y = (int16_t)sys_get_le16(&raw[6]);
+    frame->single_gestures = sys_get_le16(&raw[8]);
+    frame->two_finger_gestures = sys_get_le16(&raw[10]);
+    frame->info_flags = sys_get_le16(&raw[12]);
+    frame->trackpad_flags = sys_get_le16(&raw[14]);
+    frame->finger_count =
+        (uint8_t)(frame->trackpad_flags & IQS9151_TP_FINGER_COUNT_MASK);
+    frame->finger1_x = sys_get_le16(&raw[16]);
+    frame->finger1_y = sys_get_le16(&raw[18]);
+}
+
+static void iqs9151_update_prev_frame(struct iqs9151_data *data,
+                                      const struct iqs9151_frame *frame,
+                                      const struct iqs9151_frame *prev_frame) {
+    data->prev_frame = *frame;
+
+    if (frame->finger_count == 0U) {
+        data->prev_finger1_valid = false;
+        data->prev_frame.finger1_x = 0;
+        data->prev_frame.finger1_y = 0;
+        return;
+    }
+
+    if ((frame->trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) == 0U) {
+        data->prev_frame.finger1_x = prev_frame->finger1_x;
+        data->prev_frame.finger1_y = prev_frame->finger1_y;
+    } else if (data->prev_finger1_valid) {
+        data->prev_frame.finger1_x = frame->finger1_x;
+        data->prev_frame.finger1_y = frame->finger1_y;
+    }
+}
+
 static void iqs9151_work_cb(struct k_work *work) {
     struct iqs9151_data *data = CONTAINER_OF(work, struct iqs9151_data, work);
     const struct device *dev = data->dev;
     const struct iqs9151_config *cfg = dev->config;
-    uint8_t raw_frame[16];
+    uint8_t raw_frame[20];
     struct iqs9151_frame frame;
+    struct iqs9151_frame prev_frame;
+    int16_t delta_x = 0;
+    int16_t delta_y = 0;
+    bool movement_valid = false;
     int ret;
 
-    /* Read RelativeX(0x1014) .. TrackpadFlags(0x1022) in one transaction. */
+    /* Read RelativeX(0x1014) .. Finger1Y(0x1026) in one transaction. */
     ret = iqs9151_i2c_read(cfg, IQS9151_ADDR_RELATIVE_X, raw_frame, sizeof(raw_frame));
     if (ret != 0) {
         LOG_ERR("frame read failed (%d)", ret);
@@ -401,10 +432,11 @@ static void iqs9151_work_cb(struct k_work *work) {
     }
 
     iqs9151_parse_frame(raw_frame, &frame);
+    prev_frame = data->prev_frame;
 
-    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d", frame.rel_x,
-            frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
-            frame.trackpad_flags, frame.finger_count);
+    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u",
+            frame.rel_x, frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
+            frame.trackpad_flags, frame.finger_count, frame.finger1_x, frame.finger1_y);
 
     if (frame.info_flags & IQS9151_INFO_SHOW_RESET) {
         /* TODO: handle reset indication if needed */
@@ -472,9 +504,25 @@ static void iqs9151_work_cb(struct k_work *work) {
 
 
     } else if (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED) {
-        // Report Relative XY
-        input_report_rel(dev, INPUT_REL_X, frame.rel_x, false, K_NO_WAIT);
-        input_report_rel(dev, INPUT_REL_Y, frame.rel_y, true, K_NO_WAIT);
+        const bool finger1_confident =
+            (frame.trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) != 0U;
+
+        if (finger1_confident) {
+            if (!data->prev_finger1_valid) {
+                data->prev_finger1_valid = true;
+                delta_x = 0;
+                delta_y = 0;
+            } else {
+                delta_x = (int16_t)((int32_t)frame.finger1_x - (int32_t)prev_frame.finger1_x);
+                delta_y = (int16_t)((int32_t)frame.finger1_y - (int32_t)prev_frame.finger1_y);
+            }
+            movement_valid = true;
+        }
+
+        if (movement_valid) {
+            input_report_rel(dev, INPUT_REL_X, delta_x, false, K_NO_WAIT);
+            input_report_rel(dev, INPUT_REL_Y, delta_y, true, K_NO_WAIT);
+        }
     } else {
         /* TODO: no movement/gesture; optionally handle idle state */
     }
@@ -483,7 +531,7 @@ static void iqs9151_work_cb(struct k_work *work) {
         ((data->prev_frame.single_gestures & BIT(3)) != 0U)) {
         input_report_key(dev, INPUT_BTN_0, false, true, K_NO_WAIT);
     }
-    data->prev_frame = frame;
+    iqs9151_update_prev_frame(data, &frame, &prev_frame);
 }
 
 static void iqs9151_gpio_cb(const struct device *port, struct gpio_callback *cb, uint32_t pins) {
