@@ -51,6 +51,8 @@ struct iqs9151_data {
 #define IQS9151_I2C_CHUNK_SIZE 30
 #define IQS9151_RSTD_DELAY_MS 100
 #define IQS9151_RESET_PULSE_US 200
+#define IQS9151_ATI_TIMEOUT_MS 1000
+#define IQS9151_ATI_POLL_INTERVAL_MS 10
 
 static const uint8_t iqs9151_alp_compensation[] = {
     ALP_COMPENSATION_RX0_0,  ALP_COMPENSATION_RX0_1,  ALP_COMPENSATION_RX1_0,
@@ -394,6 +396,11 @@ static void iqs9151_parse_frame(const uint8_t *raw, struct iqs9151_frame *frame)
 static void iqs9151_update_prev_frame(struct iqs9151_data *data,
                                       const struct iqs9151_frame *frame,
                                       const struct iqs9151_frame *prev_frame) {
+    const bool finger1_confident =
+        (frame->trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) != 0U;
+    const bool finger1_coord_valid =
+        (frame->finger1_x != UINT16_MAX) && (frame->finger1_y != UINT16_MAX);
+
     data->prev_frame = *frame;
 
     if (frame->finger_count == 0U) {
@@ -403,9 +410,10 @@ static void iqs9151_update_prev_frame(struct iqs9151_data *data,
         return;
     }
 
-    if ((frame->trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) == 0U) {
+    if (!finger1_confident || !finger1_coord_valid) {
         data->prev_frame.finger1_x = prev_frame->finger1_x;
         data->prev_frame.finger1_y = prev_frame->finger1_y;
+        data->prev_finger1_valid = false;
     } else if (data->prev_finger1_valid) {
         data->prev_frame.finger1_x = frame->finger1_x;
         data->prev_frame.finger1_y = frame->finger1_y;
@@ -433,10 +441,6 @@ static void iqs9151_work_cb(struct k_work *work) {
 
     iqs9151_parse_frame(raw_frame, &frame);
     prev_frame = data->prev_frame;
-
-    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u",
-            frame.rel_x, frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
-            frame.trackpad_flags, frame.finger_count, frame.finger1_x, frame.finger1_y);
 
     if (frame.info_flags & IQS9151_INFO_SHOW_RESET) {
         /* TODO: handle reset indication if needed */
@@ -506,8 +510,10 @@ static void iqs9151_work_cb(struct k_work *work) {
     } else if (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED) {
         const bool finger1_confident =
             (frame.trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) != 0U;
+        const bool finger1_coord_valid =
+            (frame.finger1_x != UINT16_MAX) && (frame.finger1_y != UINT16_MAX);
 
-        if (finger1_confident) {
+        if (finger1_confident && finger1_coord_valid) {
             if (!data->prev_finger1_valid) {
                 data->prev_finger1_valid = true;
                 delta_x = 0;
@@ -517,16 +523,23 @@ static void iqs9151_work_cb(struct k_work *work) {
                 delta_y = (int16_t)((int32_t)frame.finger1_y - (int32_t)prev_frame.finger1_y);
             }
             movement_valid = true;
+        } else {
+            data->prev_finger1_valid = false;
         }
 
         if (movement_valid) {
             input_report_rel(dev, INPUT_REL_X, delta_x, false, K_NO_WAIT);
             input_report_rel(dev, INPUT_REL_Y, delta_y, true, K_NO_WAIT);
+
         }
     } else {
         /* TODO: no movement/gesture; optionally handle idle state */
     }
 
+    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u delta x=%d y=%d",
+            frame.rel_x, frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
+            frame.trackpad_flags, frame.finger_count, frame.finger1_x, frame.finger1_y, delta_x, delta_y);
+            
     if (frame.finger_count == 0U &&
         ((data->prev_frame.single_gestures & BIT(3)) != 0U)) {
         input_report_key(dev, INPUT_BTN_0, false, true, K_NO_WAIT);
@@ -554,6 +567,32 @@ static int iqs9151_run_ati(const struct iqs9151_config *config) {
         SYSTEM_CONTROL_1 | IQS9151_SYS_CTRL_ALP_RE_ATI | IQS9151_SYS_CTRL_TP_RE_ATI,
     };
     return iqs9151_i2c_write(config, IQS9151_ADDR_SYSTEM_CONTROL, ctrl, sizeof(ctrl));
+}
+
+static int iqs9151_wait_for_ati(const struct device *dev, uint16_t timeout_ms) {
+    const struct iqs9151_config *cfg = dev->config;
+    int64_t start_ms = k_uptime_get();
+
+    while ((k_uptime_get() - start_ms) < timeout_ms) {
+        uint8_t ctrl[2];
+        int ret;
+
+        iqs9151_wait_for_ready(dev, 100);
+        ret = iqs9151_i2c_read(cfg, IQS9151_ADDR_SYSTEM_CONTROL, ctrl, sizeof(ctrl));
+        if (ret != 0) {
+            return ret;
+        }
+
+        if ((sys_get_le16(ctrl) &
+             (IQS9151_SYS_CTRL_ALP_RE_ATI | IQS9151_SYS_CTRL_TP_RE_ATI)) == 0U) {
+            return 0;
+        }
+
+        k_sleep(K_MSEC(IQS9151_ATI_POLL_INTERVAL_MS));
+    }
+
+    LOG_ERR("ATI timeout after %dms", timeout_ms);
+    return -EIO;
 }
 
 static int iqs9151_ack_reset(const struct device *dev) {
@@ -753,7 +792,12 @@ static int iqs9151_init(const struct device *dev) {
     }
     LOG_DBG("ATI requested");
 
-    iqs9151_wait_for_ready(dev, 1000);
+    ret = iqs9151_wait_for_ati(dev, IQS9151_ATI_TIMEOUT_MS);
+    if (ret != 0) {
+        LOG_ERR("ATI failed (%d)", ret);
+        return ret;
+    }
+    LOG_DBG("ATI complete");
 
     // Setup IRQ Call Back
     k_work_init(&data->work, iqs9151_work_cb);

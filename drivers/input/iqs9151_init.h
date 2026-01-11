@@ -95,7 +95,7 @@
 
 /* Sampling Periods and Timing */
 /* Memory Map Position 0x11A2 - 0x11BB */
-#define ACTIVE_MODE_SAMPLING_PERIOD_0            0x05
+#define ACTIVE_MODE_SAMPLING_PERIOD_0            0x0A // 0x05
 #define ACTIVE_MODE_SAMPLING_PERIOD_1            0x00
 #define IDLE_TOUCH_MODE_SAMPLING_PERIOD_0        0x32
 #define IDLE_TOUCH_MODE_SAMPLING_PERIOD_1        0x00
@@ -185,17 +185,17 @@
 #define X_RESOLUTION_1                           0x0C
 #define Y_RESOLUTION_0                           0x01
 #define Y_RESOLUTION_1                           0x0B
-#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_0         0x35 // 0x05
-#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_1         0x00 // 0x00 
-#define XY_DYNAMIC_FILTER_TOP_SPEED_0            0x2C // 0x2C
-#define XY_DYNAMIC_FILTER_TOP_SPEED_1            0x21 // 0x01
-#define XY_DYNAMIC_FILTER_BOTTOM_BETA            0x10 //0x10
-#define XY_DYNAMIC_FILTER_STATIC_FILTER_BETA     0x10 //0x80
-#define STATIONARY_TOUCH_MOV_THRESHOLD           0x14
+#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_0         0x14
+#define XY_DYNAMIC_FILTER_BOTTOM_SPEED_1         0x00
+#define XY_DYNAMIC_FILTER_TOP_SPEED_0            0xFF
+#define XY_DYNAMIC_FILTER_TOP_SPEED_1            0x01
+#define XY_DYNAMIC_FILTER_BOTTOM_BETA            0x0A
+#define XY_DYNAMIC_FILTER_STATIC_FILTER_BETA     0x14
+#define STATIONARY_TOUCH_MOV_THRESHOLD           0x05 // 0x14
 #define FINGER_SPLIT_FACTOR                      0x03
 #define X_TRIM_VALUE                             0x14
 #define Y_TRIM_VALUE                             0x14
-#define JITTER_FILTER_DELTA                      0x01 //0x02
+#define JITTER_FILTER_DELTA                      0x02 //0x02
 #define FINGER_CONFIDENCE_THRESHOLD              0x14
 
 /* Gesture Settings */
