@@ -61,7 +61,6 @@ struct iqs9151_data {
     struct k_work work;
     struct k_work_delayable inertia_work;
     struct iqs9151_frame prev_frame;
-    bool prev_finger1_valid;
     bool inertia_active;
     int32_t inertia_vx_fp;
     int32_t inertia_vy_fp;
@@ -427,7 +426,6 @@ static void iqs9151_update_prev_frame(struct iqs9151_data *data,
     data->prev_frame = *frame;
 
     if (frame->finger_count == 0U) {
-        data->prev_finger1_valid = false;
         data->prev_frame.finger1_x = 0;
         data->prev_frame.finger1_y = 0;
         return;
@@ -436,10 +434,6 @@ static void iqs9151_update_prev_frame(struct iqs9151_data *data,
     if (!finger1_confident || !finger1_coord_valid) {
         data->prev_frame.finger1_x = prev_frame->finger1_x;
         data->prev_frame.finger1_y = prev_frame->finger1_y;
-        data->prev_finger1_valid = false;
-    } else if (data->prev_finger1_valid) {
-        data->prev_frame.finger1_x = frame->finger1_x;
-        data->prev_frame.finger1_y = frame->finger1_y;
     }
 }
 
@@ -579,8 +573,6 @@ static void iqs9151_work_cb(struct k_work *work) {
     uint8_t raw_frame[20];
     struct iqs9151_frame frame;
     struct iqs9151_frame prev_frame;
-    int16_t delta_x = 0;
-    int16_t delta_y = 0;
     bool movement_valid = false;
     int ret;
 
@@ -593,15 +585,14 @@ static void iqs9151_work_cb(struct k_work *work) {
 
     iqs9151_parse_frame(raw_frame, &frame);
     prev_frame = data->prev_frame;
+
+    // Cancel Inertial Scrolling
     const bool prev_hscroll = (prev_frame.two_finger_gestures & BIT(7)) != 0U;
     const bool prev_vscroll = (prev_frame.two_finger_gestures & BIT(6)) != 0U;
     const bool curr_hscroll = (frame.two_finger_gestures & BIT(7)) != 0U;
     const bool curr_vscroll = (frame.two_finger_gestures & BIT(6)) != 0U;
-    const bool scroll_started =
-        (!prev_hscroll && !prev_vscroll) && (curr_hscroll || curr_vscroll);
-    const bool scroll_ended =
-        (prev_hscroll || prev_vscroll) && !curr_hscroll && !curr_vscroll;
-
+    const bool scroll_started = (!prev_hscroll && !prev_vscroll) && (curr_hscroll || curr_vscroll);
+    const bool scroll_ended   = (prev_hscroll || prev_vscroll) && !curr_hscroll && !curr_vscroll;
     if (scroll_started || frame.finger_count == 2U) {
         iqs9151_scroll_hist_reset(data);
         if (data->inertia_active) {
@@ -678,39 +669,26 @@ static void iqs9151_work_cb(struct k_work *work) {
                 バッファをクリアする
         */
 
-
+    // TP Movement to XY Relative
     } else if (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED) {
-        const bool finger1_confident =
-            (frame.trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) != 0U;
-        const bool finger1_coord_valid =
-            (frame.finger1_x != UINT16_MAX) && (frame.finger1_y != UINT16_MAX);
 
-        if (finger1_confident && finger1_coord_valid) {
-            if (!data->prev_finger1_valid) {
-                data->prev_finger1_valid = true;
-                delta_x = 0;
-                delta_y = 0;
-            } else {
-                delta_x = (int16_t)((int32_t)frame.finger1_x - (int32_t)prev_frame.finger1_x);
-                delta_y = (int16_t)((int32_t)frame.finger1_y - (int32_t)prev_frame.finger1_y);
-            }
-            movement_valid = true;
-        } else {
-            data->prev_finger1_valid = false;
-        }
+        const bool finger1_confident = (frame.trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) != 0U;
+        const bool finger1_coord_valid = (frame.finger1_x != UINT16_MAX) && (frame.finger1_y != UINT16_MAX);
+
+        movement_valid = finger1_confident && finger1_coord_valid;
 
         if (movement_valid) {
-            input_report_rel(dev, INPUT_REL_X, delta_x, false, K_NO_WAIT);
-            input_report_rel(dev, INPUT_REL_Y, delta_y, true, K_NO_WAIT);
+            input_report_rel(dev, INPUT_REL_X, frame.rel_x, false, K_NO_WAIT);
+            input_report_rel(dev, INPUT_REL_Y, frame.rel_y, true, K_NO_WAIT);
 
         }
     } else {
         /* TODO: no movement/gesture; optionally handle idle state */
     }
 
-    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u delta x=%d y=%d",
+    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u",
             frame.rel_x, frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
-            frame.trackpad_flags, frame.finger_count, frame.finger1_x, frame.finger1_y, delta_x, delta_y);
+            frame.trackpad_flags, frame.finger_count, frame.finger1_x, frame.finger1_y);
     
     // Release Button for Press And Hold
     if (frame.finger_count == 0U &&
