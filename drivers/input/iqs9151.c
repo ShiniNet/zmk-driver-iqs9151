@@ -641,23 +641,24 @@ static void iqs9151_work_cb(struct k_work *work) {
         }
         // TwoFinger Gestures
         if (frame.two_finger_gestures != 0U) {
-            const bool hscroll = curr_hscroll;
-            const bool vscroll = curr_vscroll;
 
             if ((frame.two_finger_gestures & BIT(0)) != 0U) {
                 input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
                 input_report_key(dev, INPUT_BTN_1, false, true, K_FOREVER);
             }
-            if (hscroll) {
-                input_report_rel(dev, INPUT_REL_HWHEEL, frame.gesture_x, !vscroll, K_NO_WAIT);
+            if (curr_hscroll) {
+                input_report_rel(dev, INPUT_REL_HWHEEL, frame.gesture_x, !curr_vscroll, K_NO_WAIT);
                 iqs9151_scroll_hist_push(data->scroll_hist_x, &data->scroll_hist_pos_x,
                                          &data->scroll_hist_count_x, frame.gesture_x);
             }
-            if (vscroll) {
+            if (curr_vscroll) {
                 input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_y, true, K_NO_WAIT);
                 iqs9151_scroll_hist_push(data->scroll_hist_y, &data->scroll_hist_pos_y,
                                          &data->scroll_hist_count_y, frame.gesture_y);
             }
+
+            // TODO ピンチインピンチアウト処理を実装する
+            // OS依存するのでやるならイベントを起こしてZMKで処理したい
         }
         // TODO ThreeFinger Gesturesを実装する （ICに機能が無いので自前実装
         /* ThreeFinger Gestures
