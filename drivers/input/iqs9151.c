@@ -22,6 +22,21 @@
 LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 
 #define DT_DRV_COMPAT azoteq_iqs9151
+
+#define IQS9151_I2C_CHUNK_SIZE 30
+#define IQS9151_RSTD_DELAY_MS 100
+#define IQS9151_RESET_PULSE_US 200
+#define IQS9151_ATI_TIMEOUT_MS 1000
+#define IQS9151_ATI_POLL_INTERVAL_MS 10
+#define INERTIA_INTERVAL_MS 10
+#define INERTIA_MAX_DURATION_MS 3000
+#define INERTIA_AVG_FRAMES 5
+#define INERTIA_DECAY_NUM 985
+#define INERTIA_DECAY_DEN 1000
+#define INERTIA_FP_SHIFT 8
+#define INERTIA_START_THRESHOLD 1
+#define INERTIA_MIN_VELOCITY 1
+
 struct iqs9151_config {
     struct i2c_dt_spec bus;
     struct gpio_dt_spec irq_gpio;
@@ -44,15 +59,23 @@ struct iqs9151_data {
     const struct device *dev;
     struct gpio_callback gpio_cb;
     struct k_work work;
+    struct k_work_delayable inertia_work;
     struct iqs9151_frame prev_frame;
     bool prev_finger1_valid;
+    bool inertia_active;
+    int32_t inertia_vx_fp;
+    int32_t inertia_vy_fp;
+    int32_t inertia_accum_x_fp;
+    int32_t inertia_accum_y_fp;
+    int64_t inertia_last_ms;
+    uint32_t inertia_elapsed_ms;
+    int16_t scroll_hist_x[INERTIA_AVG_FRAMES];
+    int16_t scroll_hist_y[INERTIA_AVG_FRAMES];
+    uint8_t scroll_hist_pos_x;
+    uint8_t scroll_hist_pos_y;
+    uint8_t scroll_hist_count_x;
+    uint8_t scroll_hist_count_y;
 };
-
-#define IQS9151_I2C_CHUNK_SIZE 30
-#define IQS9151_RSTD_DELAY_MS 100
-#define IQS9151_RESET_PULSE_US 200
-#define IQS9151_ATI_TIMEOUT_MS 1000
-#define IQS9151_ATI_POLL_INTERVAL_MS 10
 
 static const uint8_t iqs9151_alp_compensation[] = {
     ALP_COMPENSATION_RX0_0,  ALP_COMPENSATION_RX0_1,  ALP_COMPENSATION_RX1_0,
@@ -420,6 +443,135 @@ static void iqs9151_update_prev_frame(struct iqs9151_data *data,
     }
 }
 
+static int32_t iqs9151_abs32(int32_t value) {
+    return (value < 0) ? -value : value;
+}
+
+static void iqs9151_scroll_hist_reset(struct iqs9151_data *data) {
+    data->scroll_hist_pos_x = 0U;
+    data->scroll_hist_pos_y = 0U;
+    data->scroll_hist_count_x = 0U;
+    data->scroll_hist_count_y = 0U;
+}
+
+static void iqs9151_scroll_hist_push(int16_t *buf, uint8_t *pos, uint8_t *count, int16_t val) {
+    buf[*pos] = val;
+    *pos = (uint8_t)((*pos + 1U) % INERTIA_AVG_FRAMES);
+    if (*count < INERTIA_AVG_FRAMES) {
+        (*count)++;
+    }
+}
+
+static int32_t iqs9151_scroll_hist_weighted_avg(const int16_t *buf, uint8_t pos, uint8_t count) {
+    if (count == 0U) {
+        return 0;
+    }
+
+    uint32_t weight_sum = 0U;
+    int32_t sum = 0;
+    uint8_t start = (uint8_t)((pos + INERTIA_AVG_FRAMES - count) % INERTIA_AVG_FRAMES);
+
+    for (uint8_t i = 0U; i < count; i++) {
+        uint8_t idx = (uint8_t)((start + i) % INERTIA_AVG_FRAMES);
+        uint32_t weight = (uint32_t)(i + 1U);
+        sum += (int32_t)buf[idx] * (int32_t)weight;
+        weight_sum += weight;
+    }
+
+    return sum / (int32_t)weight_sum;
+}
+
+static void iqs9151_inertia_cancel(struct iqs9151_data *data) {
+    data->inertia_active = false;
+    data->inertia_vx_fp = 0;
+    data->inertia_vy_fp = 0;
+    data->inertia_accum_x_fp = 0;
+    data->inertia_accum_y_fp = 0;
+    data->inertia_elapsed_ms = 0U;
+    k_work_cancel_delayable(&data->inertia_work);
+}
+
+static void iqs9151_inertia_start(struct iqs9151_data *data, int32_t avg_x, int32_t avg_y) {
+    data->inertia_vx_fp = (int32_t)(avg_x << INERTIA_FP_SHIFT);
+    data->inertia_vy_fp = (int32_t)(avg_y << INERTIA_FP_SHIFT);
+    data->inertia_accum_x_fp = 0;
+    data->inertia_accum_y_fp = 0;
+    data->inertia_elapsed_ms = 0U;
+    data->inertia_last_ms = k_uptime_get();
+    data->inertia_active = true;
+    k_work_schedule(&data->inertia_work, K_MSEC(INERTIA_INTERVAL_MS));
+}
+
+static void iqs9151_inertia_work_cb(struct k_work *work) {
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct iqs9151_data *data = CONTAINER_OF(dwork, struct iqs9151_data, inertia_work);
+    const struct device *dev = data->dev;
+    int64_t now;
+    int64_t dt_ms;
+    uint32_t steps;
+
+    if (!data->inertia_active) {
+        return;
+    }
+
+    now = k_uptime_get();
+    dt_ms = now - data->inertia_last_ms;
+    if (dt_ms <= 0) {
+        dt_ms = INERTIA_INTERVAL_MS;
+    }
+    steps = (uint32_t)((dt_ms + INERTIA_INTERVAL_MS - 1) / INERTIA_INTERVAL_MS);
+    if (steps == 0U) {
+        steps = 1U;
+    }
+
+    for (uint32_t i = 0U; i < steps; i++) {
+        data->inertia_accum_x_fp += data->inertia_vx_fp;
+        data->inertia_accum_y_fp += data->inertia_vy_fp;
+        data->inertia_vx_fp =
+            (data->inertia_vx_fp * INERTIA_DECAY_NUM) / INERTIA_DECAY_DEN;
+        data->inertia_vy_fp =
+            (data->inertia_vy_fp * INERTIA_DECAY_NUM) / INERTIA_DECAY_DEN;
+    }
+
+    data->inertia_last_ms = now;
+    data->inertia_elapsed_ms += steps * INERTIA_INTERVAL_MS;
+
+    int32_t out_x = data->inertia_accum_x_fp >> INERTIA_FP_SHIFT;
+    int32_t out_y = data->inertia_accum_y_fp >> INERTIA_FP_SHIFT;
+    data->inertia_accum_x_fp -= out_x << INERTIA_FP_SHIFT;
+    data->inertia_accum_y_fp -= out_y << INERTIA_FP_SHIFT;
+
+    if (out_x > INT16_MAX) {
+        out_x = INT16_MAX;
+    } else if (out_x < INT16_MIN) {
+        out_x = INT16_MIN;
+    }
+    if (out_y > INT16_MAX) {
+        out_y = INT16_MAX;
+    } else if (out_y < INT16_MIN) {
+        out_y = INT16_MIN;
+    }
+
+    const bool have_x = out_x != 0;
+    const bool have_y = out_y != 0;
+    if (have_x) {
+        input_report_rel(dev, INPUT_REL_HWHEEL, (int16_t)out_x, !have_y, K_NO_WAIT);
+    }
+    if (have_y) {
+        input_report_rel(dev, INPUT_REL_WHEEL, (int16_t)out_y, true, K_NO_WAIT);
+    }
+
+    const int32_t min_v_fp = (int32_t)(INERTIA_MIN_VELOCITY << INERTIA_FP_SHIFT);
+    if (data->inertia_elapsed_ms >= INERTIA_MAX_DURATION_MS ||
+        (iqs9151_abs32(data->inertia_vx_fp) < min_v_fp &&
+         iqs9151_abs32(data->inertia_vy_fp) < min_v_fp)) {
+        iqs9151_inertia_cancel(data);
+        return;
+    }
+
+    k_work_schedule(&data->inertia_work, K_MSEC(INERTIA_INTERVAL_MS));
+}
+
 static void iqs9151_work_cb(struct k_work *work) {
     struct iqs9151_data *data = CONTAINER_OF(work, struct iqs9151_data, work);
     const struct device *dev = data->dev;
@@ -441,6 +593,21 @@ static void iqs9151_work_cb(struct k_work *work) {
 
     iqs9151_parse_frame(raw_frame, &frame);
     prev_frame = data->prev_frame;
+    const bool prev_hscroll = (prev_frame.two_finger_gestures & BIT(7)) != 0U;
+    const bool prev_vscroll = (prev_frame.two_finger_gestures & BIT(6)) != 0U;
+    const bool curr_hscroll = (frame.two_finger_gestures & BIT(7)) != 0U;
+    const bool curr_vscroll = (frame.two_finger_gestures & BIT(6)) != 0U;
+    const bool scroll_started =
+        (!prev_hscroll && !prev_vscroll) && (curr_hscroll || curr_vscroll);
+    const bool scroll_ended =
+        (prev_hscroll || prev_vscroll) && !curr_hscroll && !curr_vscroll;
+
+    if (scroll_started || frame.finger_count == 2U) {
+        iqs9151_scroll_hist_reset(data);
+        if (data->inertia_active) {
+            iqs9151_inertia_cancel(data);
+        }
+    }
 
     if (frame.info_flags & IQS9151_INFO_SHOW_RESET) {
         /* TODO: handle reset indication if needed */
@@ -474,8 +641,8 @@ static void iqs9151_work_cb(struct k_work *work) {
         }
         // TwoFinger Gestures
         if (frame.two_finger_gestures != 0U) {
-            const bool hscroll = (frame.two_finger_gestures & BIT(7)) != 0U;
-            const bool vscroll = (frame.two_finger_gestures & BIT(6)) != 0U;
+            const bool hscroll = curr_hscroll;
+            const bool vscroll = curr_vscroll;
 
             if ((frame.two_finger_gestures & BIT(0)) != 0U) {
                 input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
@@ -483,9 +650,13 @@ static void iqs9151_work_cb(struct k_work *work) {
             }
             if (hscroll) {
                 input_report_rel(dev, INPUT_REL_HWHEEL, frame.gesture_x, !vscroll, K_NO_WAIT);
+                iqs9151_scroll_hist_push(data->scroll_hist_x, &data->scroll_hist_pos_x,
+                                         &data->scroll_hist_count_x, frame.gesture_x);
             }
             if (vscroll) {
                 input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_y, true, K_NO_WAIT);
+                iqs9151_scroll_hist_push(data->scroll_hist_y, &data->scroll_hist_pos_y,
+                                         &data->scroll_hist_count_y, frame.gesture_y);
             }
         }
         // TODO ThreeFinger Gesturesを実装する （ICに機能が無いので自前実装
@@ -539,10 +710,26 @@ static void iqs9151_work_cb(struct k_work *work) {
     LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u delta x=%d y=%d",
             frame.rel_x, frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
             frame.trackpad_flags, frame.finger_count, frame.finger1_x, frame.finger1_y, delta_x, delta_y);
-            
+    
+    // Release Button for Press And Hold
     if (frame.finger_count == 0U &&
         ((data->prev_frame.single_gestures & BIT(3)) != 0U)) {
         input_report_key(dev, INPUT_BTN_0, false, true, K_NO_WAIT);
+    }
+
+    // Inertial Scrolling
+    if (scroll_ended) {
+        int32_t avg_x = iqs9151_scroll_hist_weighted_avg(
+            data->scroll_hist_x, data->scroll_hist_pos_x, data->scroll_hist_count_x);
+        int32_t avg_y = iqs9151_scroll_hist_weighted_avg(
+            data->scroll_hist_y, data->scroll_hist_pos_y, data->scroll_hist_count_y);
+        int32_t start_x = (iqs9151_abs32(avg_x) >= INERTIA_START_THRESHOLD) ? avg_x : 0;
+        int32_t start_y = (iqs9151_abs32(avg_y) >= INERTIA_START_THRESHOLD) ? avg_y : 0;
+
+        if (start_x != 0 || start_y != 0) {
+            iqs9151_inertia_start(data, start_x, start_y);
+        }
+        iqs9151_scroll_hist_reset(data);
     }
     iqs9151_update_prev_frame(data, &frame, &prev_frame);
 }
@@ -801,6 +988,9 @@ static int iqs9151_init(const struct device *dev) {
 
     // Setup IRQ Call Back
     k_work_init(&data->work, iqs9151_work_cb);
+    k_work_init_delayable(&data->inertia_work, iqs9151_inertia_work_cb);
+    iqs9151_scroll_hist_reset(data);
+    data->inertia_active = false;
     gpio_init_callback(&data->gpio_cb, iqs9151_gpio_cb,
                         BIT(cfg->irq_gpio.pin));
     ret = gpio_add_callback(cfg->irq_gpio.port, &data->gpio_cb);
