@@ -36,6 +36,11 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 #define INERTIA_FP_SHIFT 8
 #define INERTIA_START_THRESHOLD 1
 #define INERTIA_MIN_VELOCITY 1
+#define THREE_FINGER_TAP_TIME_MS 150
+#define THREE_FINGER_TAP_MOVE 12
+#define THREE_FINGER_HOLD_TIME_MS 300
+#define THREE_FINGER_HOLD_MOVE 30
+#define THREE_FINGER_SWIPE_DIST 300
 
 struct iqs9151_config {
     struct i2c_dt_spec bus;
@@ -74,6 +79,14 @@ struct iqs9151_data {
     uint8_t scroll_hist_pos_y;
     uint8_t scroll_hist_count_x;
     uint8_t scroll_hist_count_y;
+    bool three_active;
+    bool three_hold_sent;
+    bool three_swipe_sent;
+    int64_t three_down_ms;
+    int32_t three_dx;
+    int32_t three_dy;
+    uint16_t three_last_x;
+    uint16_t three_last_y;
 };
 
 static const uint8_t iqs9151_alp_compensation[] = {
@@ -441,6 +454,15 @@ static int32_t iqs9151_abs32(int32_t value) {
     return (value < 0) ? -value : value;
 }
 
+static bool iqs9151_finger1_valid(const struct iqs9151_frame *frame) {
+    const bool finger1_confident =
+        (frame->trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) != 0U;
+    const bool finger1_coord_valid =
+        (frame->finger1_x != UINT16_MAX) && (frame->finger1_y != UINT16_MAX);
+
+    return finger1_confident && finger1_coord_valid;
+}
+
 static void iqs9151_scroll_hist_reset(struct iqs9151_data *data) {
     data->scroll_hist_pos_x = 0U;
     data->scroll_hist_pos_y = 0U;
@@ -483,6 +505,94 @@ static void iqs9151_inertia_cancel(struct iqs9151_data *data) {
     data->inertia_accum_y_fp = 0;
     data->inertia_elapsed_ms = 0U;
     k_work_cancel_delayable(&data->inertia_work);
+}
+
+static void iqs9151_three_finger_reset(struct iqs9151_data *data) {
+    data->three_active = false;
+    data->three_hold_sent = false;
+    data->three_swipe_sent = false;
+    data->three_down_ms = 0;
+    data->three_dx = 0;
+    data->three_dy = 0;
+    data->three_last_x = 0;
+    data->three_last_y = 0;
+}
+
+static bool iqs9151_three_finger_update(struct iqs9151_data *data,
+                                        const struct iqs9151_frame *frame,
+                                        const struct iqs9151_frame *prev_frame,
+                                        const struct device *dev) {
+    const bool finger1_valid = iqs9151_finger1_valid(frame);
+
+    if (!data->three_active && frame->finger_count == 3U) {
+        data->three_active = true;
+        data->three_hold_sent = false;
+        data->three_swipe_sent = false;
+        data->three_down_ms = k_uptime_get();
+        data->three_dx = 0;
+        data->three_dy = 0;
+        if (finger1_valid) {
+            data->three_last_x = frame->finger1_x;
+            data->three_last_y = frame->finger1_y;
+        } else if (iqs9151_finger1_valid(prev_frame)) {
+            data->three_last_x = prev_frame->finger1_x;
+            data->three_last_y = prev_frame->finger1_y;
+        }
+        if (data->inertia_active) {
+            iqs9151_inertia_cancel(data);
+        }
+    }
+
+    if (!data->three_active) {
+        return false;
+    }
+
+    if (frame->finger_count == 3U) {
+        if (finger1_valid) {
+            int32_t dx = (int32_t)frame->finger1_x - (int32_t)data->three_last_x;
+            int32_t dy = (int32_t)frame->finger1_y - (int32_t)data->three_last_y;
+            data->three_dx += dx;
+            data->three_dy += dy;
+            data->three_last_x = frame->finger1_x;
+            data->three_last_y = frame->finger1_y;
+        }
+
+        if (!data->three_swipe_sent && !data->three_hold_sent) {
+            if (iqs9151_abs32(data->three_dx) >= THREE_FINGER_SWIPE_DIST &&
+                iqs9151_abs32(data->three_dx) >= iqs9151_abs32(data->three_dy)) {
+                uint16_t key = (data->three_dx < 0) ? INPUT_BTN_3 : INPUT_BTN_4;
+                input_report_key(dev, key, true, true, K_FOREVER);
+                input_report_key(dev, key, false, true, K_FOREVER);
+                data->three_swipe_sent = true;
+            }
+        }
+
+        if (!data->three_swipe_sent && !data->three_hold_sent) {
+            const int64_t elapsed = k_uptime_get() - data->three_down_ms;
+            if (elapsed >= THREE_FINGER_HOLD_TIME_MS &&
+                iqs9151_abs32(data->three_dx) <= THREE_FINGER_HOLD_MOVE &&
+                iqs9151_abs32(data->three_dy) <= THREE_FINGER_HOLD_MOVE) {
+                input_report_key(dev, INPUT_BTN_2, true, true, K_FOREVER);
+                data->three_hold_sent = true;
+            }
+        }
+        return true;
+    }
+
+    if (data->three_hold_sent) {
+        input_report_key(dev, INPUT_BTN_2, false, true, K_NO_WAIT);
+    } else if (!data->three_swipe_sent) {
+        const int64_t elapsed = k_uptime_get() - data->three_down_ms;
+        if (elapsed <= THREE_FINGER_TAP_TIME_MS &&
+            iqs9151_abs32(data->three_dx) <= THREE_FINGER_TAP_MOVE &&
+            iqs9151_abs32(data->three_dy) <= THREE_FINGER_TAP_MOVE) {
+            input_report_key(dev, INPUT_BTN_2, true, true, K_FOREVER);
+            input_report_key(dev, INPUT_BTN_2, false, true, K_FOREVER);
+        }
+    }
+
+    iqs9151_three_finger_reset(data);
+    return true;
 }
 
 static void iqs9151_inertia_start(struct iqs9151_data *data, int32_t avg_x, int32_t avg_y) {
@@ -573,7 +683,6 @@ static void iqs9151_work_cb(struct k_work *work) {
     uint8_t raw_frame[20];
     struct iqs9151_frame frame;
     struct iqs9151_frame prev_frame;
-    bool movement_valid = false;
     int ret;
 
     /* Read RelativeX(0x1014) .. Finger1Y(0x1026) in one transaction. */
@@ -605,7 +714,11 @@ static void iqs9151_work_cb(struct k_work *work) {
         return;
     }
 
-    if (frame.single_gestures != 0U || frame.two_finger_gestures != 0U) {
+    const bool three_candidate = (frame.finger_count == 3U) || data->three_active;
+    const bool three_consumed =
+        three_candidate ? iqs9151_three_finger_update(data, &frame, &prev_frame, dev) : false;
+
+    if (!three_consumed && (frame.single_gestures != 0U || frame.two_finger_gestures != 0U)) {
         // SingleFingerGestures
         if (frame.single_gestures != 0U) {
             const uint16_t single = frame.single_gestures;
@@ -651,37 +764,13 @@ static void iqs9151_work_cb(struct k_work *work) {
             // TODO ピンチインピンチアウト処理を実装する
             // OS依存するのでやるならイベントを起こしてZMKで処理したい
         }
-        // TODO ThreeFinger Gesturesを実装する （ICに機能が無いので自前実装
-        /* ThreeFinger Gestures
-            IFタッチしている指の本数が3本
-                ThreeFinger Gestures開始フラグON
-                指1の移動量（Finger1X/Y-Coordinate）を取得し、バッファに加算
-            
-            IF タッチしている指の本数がゼロ＆ ThreeFinger Gestures開始フラグON
-                スワイプが確定したということで、イベント処理開始
-                IF バッファを参照し、移動量が閾値を超えている
-                    IF 移動が右方向
-                        進むボタンをレポート
-                    IF 移動が左方向
-                        戻るボタンをレポート
-                
-                ThreeFinger Gestures開始フラグOFFにする
-                バッファをクリアする
-        */
 
     // TP Movement to XY Relative
-    } else if (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED) {
+    } else if (!three_consumed && (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED)) {
 
-        const bool finger1_confident = (frame.trackpad_flags & IQS9151_TP_FINGER1_CONFIDENCE) != 0U;
-        const bool finger1_coord_valid = (frame.finger1_x != UINT16_MAX) && (frame.finger1_y != UINT16_MAX);
+        input_report_rel(dev, INPUT_REL_X, frame.rel_x, false, K_NO_WAIT);
+        input_report_rel(dev, INPUT_REL_Y, frame.rel_y, true, K_NO_WAIT);
 
-        movement_valid = finger1_confident && finger1_coord_valid;
-
-        if (movement_valid) {
-            input_report_rel(dev, INPUT_REL_X, frame.rel_x, false, K_NO_WAIT);
-            input_report_rel(dev, INPUT_REL_Y, frame.rel_y, true, K_NO_WAIT);
-
-        }
     } else {
         /* TODO: no movement/gesture; optionally handle idle state */
     }
@@ -970,6 +1059,7 @@ static int iqs9151_init(const struct device *dev) {
     k_work_init_delayable(&data->inertia_work, iqs9151_inertia_work_cb);
     iqs9151_scroll_hist_reset(data);
     data->inertia_active = false;
+    iqs9151_three_finger_reset(data);
     gpio_init_callback(&data->gpio_cb, iqs9151_gpio_cb,
                         BIT(cfg->irq_gpio.pin));
     ret = gpio_add_callback(cfg->irq_gpio.port, &data->gpio_cb);
