@@ -42,10 +42,10 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 
 #define CURSOR_INERTIA_INTERVAL_MS 10
 #define CURSOR_INERTIA_MAX_DURATION_MS 3000
-#define CURSOR_INERTIA_DECAY_NUM 985
+#define CURSOR_INERTIA_DECAY_NUM 960
 #define CURSOR_INERTIA_DECAY_DEN 1000
 #define CURSOR_INERTIA_START_THRESHOLD 2
-#define CURSOR_INERTIA_MIN_VELOCITY 5
+#define CURSOR_INERTIA_MIN_VELOCITY 2
 #define CURSOR_EMA_ALPHA 30
 #define CURSOR_GUARD_FRAMES 5
 #define THREE_FINGER_TAP_TIME_MS 150
@@ -631,9 +631,12 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         if (elapsed <= THREE_FINGER_TAP_TIME_MS &&
             iqs9151_abs32(data->three_dx) <= THREE_FINGER_TAP_MOVE &&
             iqs9151_abs32(data->three_dy) <= THREE_FINGER_TAP_MOVE) {
+            const bool had_hold = data->hold_button != 0U;
             iqs9151_release_hold(data, dev);
-            input_report_key(dev, INPUT_BTN_2, true, true, K_FOREVER);
-            input_report_key(dev, INPUT_BTN_2, false, true, K_FOREVER);
+            if (!had_hold) {
+                input_report_key(dev, INPUT_BTN_2, true, true, K_FOREVER);
+                input_report_key(dev, INPUT_BTN_2, false, true, K_FOREVER);
+            }
         }
     }
 
@@ -861,9 +864,12 @@ static void iqs9151_work_cb(struct k_work *work) {
 
             if (single_tap) {
                 LOG_DBG("Single Tap Event occurred!");
+                const bool had_hold = data->hold_button != 0U;
                 iqs9151_release_hold(data, dev);
-                input_report_key(dev, INPUT_BTN_0, true, true, K_FOREVER);
-                input_report_key(dev, INPUT_BTN_0, false, true, K_FOREVER);
+                if (!had_hold) {
+                    input_report_key(dev, INPUT_BTN_0, true, true, K_FOREVER);
+                    input_report_key(dev, INPUT_BTN_0, false, true, K_FOREVER);
+                }
 
             } else if (press_hold) {
                 LOG_DBG("Press Hold Event occurred!");
@@ -882,9 +888,12 @@ static void iqs9151_work_cb(struct k_work *work) {
             const bool two_press_hold = (two & BIT(3)) != 0U;
 
             if (two_tap) {
+                const bool had_hold = data->hold_button != 0U;
                 iqs9151_release_hold(data, dev);
-                input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
-                input_report_key(dev, INPUT_BTN_1, false, true, K_FOREVER);
+                if (!had_hold) {
+                    input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
+                    input_report_key(dev, INPUT_BTN_1, false, true, K_FOREVER);
+                }
             }
             if (two_press_hold && data->hold_button == 0U) {
                 input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
@@ -896,9 +905,6 @@ static void iqs9151_work_cb(struct k_work *work) {
             if (curr_vscroll) {
                 input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_y, true, K_NO_WAIT);
             }
-
-            // TODO ピンチインピンチアウト処理を実装する
-            // OS依存するのでやるならイベントを起こしてZMKで処理したい
         }
 
     // TP Movement to XY Relative
