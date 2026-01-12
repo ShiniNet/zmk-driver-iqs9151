@@ -28,14 +28,26 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 #define IQS9151_RESET_PULSE_US 200
 #define IQS9151_ATI_TIMEOUT_MS 1000
 #define IQS9151_ATI_POLL_INTERVAL_MS 10
-#define INERTIA_INTERVAL_MS 10
-#define INERTIA_MAX_DURATION_MS 3000
-#define INERTIA_AVG_FRAMES 5
-#define INERTIA_DECAY_NUM 985
-#define INERTIA_DECAY_DEN 1000
 #define INERTIA_FP_SHIFT 8
-#define INERTIA_START_THRESHOLD 1
-#define INERTIA_MIN_VELOCITY 1
+#define EMA_FP_SHIFT INERTIA_FP_SHIFT
+#define EMA_ALPHA_DEN (1 << EMA_FP_SHIFT)
+
+#define SCROLL_INERTIA_INTERVAL_MS 10
+#define SCROLL_INERTIA_MAX_DURATION_MS 3000
+#define SCROLL_INERTIA_DECAY_NUM 985
+#define SCROLL_INERTIA_DECAY_DEN 1000
+#define SCROLL_INERTIA_START_THRESHOLD 1
+#define SCROLL_INERTIA_MIN_VELOCITY 1
+#define SCROLL_EMA_ALPHA 10
+
+#define CURSOR_INERTIA_INTERVAL_MS 10
+#define CURSOR_INERTIA_MAX_DURATION_MS 3000
+#define CURSOR_INERTIA_DECAY_NUM 985
+#define CURSOR_INERTIA_DECAY_DEN 1000
+#define CURSOR_INERTIA_START_THRESHOLD 2
+#define CURSOR_INERTIA_MIN_VELOCITY 5
+#define CURSOR_EMA_ALPHA 30
+#define CURSOR_GUARD_FRAMES 5
 #define THREE_FINGER_TAP_TIME_MS 150
 #define THREE_FINGER_TAP_MOVE 25
 #define THREE_FINGER_TAP_GUARD_FRAMES 5
@@ -61,25 +73,38 @@ struct iqs9151_frame {
     uint16_t finger1_x;
     uint16_t finger1_y;
 };
+struct iqs9151_inertia_params {
+    uint16_t interval_ms;
+    uint16_t max_duration_ms;
+    uint16_t decay_num;
+    uint16_t decay_den;
+    uint8_t fp_shift;
+    int16_t start_threshold;
+    int16_t min_velocity;
+    uint16_t ema_alpha;
+};
+struct iqs9151_inertia_state {
+    bool active;
+    int32_t vx_fp;
+    int32_t vy_fp;
+    int32_t accum_x_fp;
+    int32_t accum_y_fp;
+    int64_t last_ms;
+    uint32_t elapsed_ms;
+};
 struct iqs9151_data {
     const struct device *dev;
     struct gpio_callback gpio_cb;
     struct k_work work;
-    struct k_work_delayable inertia_work;
+    struct k_work_delayable inertia_scroll_work;
+    struct k_work_delayable inertia_cursor_work;
+    struct iqs9151_inertia_state inertia_scroll;
+    struct iqs9151_inertia_state inertia_cursor;
+    int32_t scroll_ema_x_fp;
+    int32_t scroll_ema_y_fp;
+    int32_t cursor_ema_x_fp;
+    int32_t cursor_ema_y_fp;
     struct iqs9151_frame prev_frame;
-    bool inertia_active;
-    int32_t inertia_vx_fp;
-    int32_t inertia_vy_fp;
-    int32_t inertia_accum_x_fp;
-    int32_t inertia_accum_y_fp;
-    int64_t inertia_last_ms;
-    uint32_t inertia_elapsed_ms;
-    int16_t scroll_hist_x[INERTIA_AVG_FRAMES];
-    int16_t scroll_hist_y[INERTIA_AVG_FRAMES];
-    uint8_t scroll_hist_pos_x;
-    uint8_t scroll_hist_pos_y;
-    uint8_t scroll_hist_count_x;
-    uint8_t scroll_hist_count_y;
     bool three_active;
     bool three_hold_sent;
     bool three_swipe_sent;
@@ -89,6 +114,7 @@ struct iqs9151_data {
     uint16_t three_last_x;
     uint16_t three_last_y;
     uint8_t three_guard_frames;
+    uint8_t cursor_guard_frames;
 };
 
 static const uint8_t iqs9151_alp_compensation[] = {
@@ -342,6 +368,26 @@ static const uint8_t iqs9151_snap_enable[] = {
     SNAPCHANNELENABLE_84, SNAPCHANNELENABLE_85, SNAPCHANNELENABLE_86,
     SNAPCHANNELENABLE_87,
 };
+static const struct iqs9151_inertia_params iqs9151_scroll_params = {
+    .interval_ms = SCROLL_INERTIA_INTERVAL_MS,
+    .max_duration_ms = SCROLL_INERTIA_MAX_DURATION_MS,
+    .decay_num = SCROLL_INERTIA_DECAY_NUM,
+    .decay_den = SCROLL_INERTIA_DECAY_DEN,
+    .fp_shift = INERTIA_FP_SHIFT,
+    .start_threshold = SCROLL_INERTIA_START_THRESHOLD,
+    .min_velocity = SCROLL_INERTIA_MIN_VELOCITY,
+    .ema_alpha = SCROLL_EMA_ALPHA,
+};
+static const struct iqs9151_inertia_params iqs9151_cursor_params = {
+    .interval_ms = CURSOR_INERTIA_INTERVAL_MS,
+    .max_duration_ms = CURSOR_INERTIA_MAX_DURATION_MS,
+    .decay_num = CURSOR_INERTIA_DECAY_NUM,
+    .decay_den = CURSOR_INERTIA_DECAY_DEN,
+    .fp_shift = INERTIA_FP_SHIFT,
+    .start_threshold = CURSOR_INERTIA_START_THRESHOLD,
+    .min_velocity = CURSOR_INERTIA_MIN_VELOCITY,
+    .ema_alpha = CURSOR_EMA_ALPHA,
+};
 
 static int iqs9151_i2c_write(const struct iqs9151_config *cfg, uint16_t reg, const uint8_t *buf, size_t len) {
     uint8_t tx[2 + IQS9151_I2C_CHUNK_SIZE];
@@ -465,48 +511,37 @@ static bool iqs9151_finger1_valid(const struct iqs9151_frame *frame) {
     return finger1_confident && finger1_coord_valid;
 }
 
-static void iqs9151_scroll_hist_reset(struct iqs9151_data *data) {
-    data->scroll_hist_pos_x = 0U;
-    data->scroll_hist_pos_y = 0U;
-    data->scroll_hist_count_x = 0U;
-    data->scroll_hist_count_y = 0U;
+static void iqs9151_ema_reset(int32_t *ema_x_fp, int32_t *ema_y_fp) {
+    *ema_x_fp = 0;
+    *ema_y_fp = 0;
 }
 
-static void iqs9151_scroll_hist_push(int16_t *buf, uint8_t *pos, uint8_t *count, int16_t val) {
-    buf[*pos] = val;
-    *pos = (uint8_t)((*pos + 1U) % INERTIA_AVG_FRAMES);
-    if (*count < INERTIA_AVG_FRAMES) {
-        (*count)++;
-    }
+static void iqs9151_ema_update(int32_t *ema_x_fp, int32_t *ema_y_fp,
+                               int16_t sample_x, int16_t sample_y, uint16_t alpha) {
+    const int32_t sample_x_fp = ((int32_t)sample_x) << EMA_FP_SHIFT;
+    const int32_t sample_y_fp = ((int32_t)sample_y) << EMA_FP_SHIFT;
+    const int32_t inv_alpha = (int32_t)(EMA_ALPHA_DEN - alpha);
+
+    *ema_x_fp =
+        ((*ema_x_fp * (int32_t)alpha) + (sample_x_fp * inv_alpha)) >> EMA_FP_SHIFT;
+    *ema_y_fp =
+        ((*ema_y_fp * (int32_t)alpha) + (sample_y_fp * inv_alpha)) >> EMA_FP_SHIFT;
 }
 
-static int32_t iqs9151_scroll_hist_weighted_avg(const int16_t *buf, uint8_t pos, uint8_t count) {
-    if (count == 0U) {
-        return 0;
-    }
-
-    uint32_t weight_sum = 0U;
-    int32_t sum = 0;
-    uint8_t start = (uint8_t)((pos + INERTIA_AVG_FRAMES - count) % INERTIA_AVG_FRAMES);
-
-    for (uint8_t i = 0U; i < count; i++) {
-        uint8_t idx = (uint8_t)((start + i) % INERTIA_AVG_FRAMES);
-        uint32_t weight = (uint32_t)(i + 1U);
-        sum += (int32_t)buf[idx] * (int32_t)weight;
-        weight_sum += weight;
-    }
-
-    return sum / (int32_t)weight_sum;
+static void iqs9151_inertia_state_reset(struct iqs9151_inertia_state *state) {
+    state->active = false;
+    state->vx_fp = 0;
+    state->vy_fp = 0;
+    state->accum_x_fp = 0;
+    state->accum_y_fp = 0;
+    state->last_ms = 0;
+    state->elapsed_ms = 0U;
 }
 
-static void iqs9151_inertia_cancel(struct iqs9151_data *data) {
-    data->inertia_active = false;
-    data->inertia_vx_fp = 0;
-    data->inertia_vy_fp = 0;
-    data->inertia_accum_x_fp = 0;
-    data->inertia_accum_y_fp = 0;
-    data->inertia_elapsed_ms = 0U;
-    k_work_cancel_delayable(&data->inertia_work);
+static void iqs9151_inertia_cancel(struct iqs9151_inertia_state *state,
+                                   struct k_work_delayable *work) {
+    iqs9151_inertia_state_reset(state);
+    k_work_cancel_delayable(work);
 }
 
 static void iqs9151_three_finger_reset(struct iqs9151_data *data) {
@@ -539,9 +574,6 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         } else if (iqs9151_finger1_valid(prev_frame)) {
             data->three_last_x = prev_frame->finger1_x;
             data->three_last_y = prev_frame->finger1_y;
-        }
-        if (data->inertia_active) {
-            iqs9151_inertia_cancel(data);
         }
     }
 
@@ -598,55 +630,90 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
     return true;
 }
 
-static void iqs9151_inertia_start(struct iqs9151_data *data, int32_t avg_x, int32_t avg_y) {
-    data->inertia_vx_fp = (int32_t)(avg_x << INERTIA_FP_SHIFT);
-    data->inertia_vy_fp = (int32_t)(avg_y << INERTIA_FP_SHIFT);
-    data->inertia_accum_x_fp = 0;
-    data->inertia_accum_y_fp = 0;
-    data->inertia_elapsed_ms = 0U;
-    data->inertia_last_ms = k_uptime_get();
-    data->inertia_active = true;
-    k_work_schedule(&data->inertia_work, K_MSEC(INERTIA_INTERVAL_MS));
+static void iqs9151_inertia_start(struct iqs9151_inertia_state *state,
+                                  struct k_work_delayable *work,
+                                  const struct iqs9151_inertia_params *params,
+                                  int32_t ema_vx_fp, int32_t ema_vy_fp) {
+    const int32_t threshold_fp =
+        (int32_t)params->start_threshold << params->fp_shift;
+    const int32_t start_vx_fp =
+        (iqs9151_abs32(ema_vx_fp) >= threshold_fp) ? ema_vx_fp : 0;
+    const int32_t start_vy_fp =
+        (iqs9151_abs32(ema_vy_fp) >= threshold_fp) ? ema_vy_fp : 0;
+
+    if (start_vx_fp == 0 && start_vy_fp == 0) {
+        return;
+    }
+
+    state->vx_fp = start_vx_fp;
+    state->vy_fp = start_vy_fp;
+    state->accum_x_fp = 0;
+    state->accum_y_fp = 0;
+    state->elapsed_ms = 0U;
+    state->last_ms = k_uptime_get();
+    state->active = true;
+    k_work_schedule(work, K_MSEC(params->interval_ms));
 }
 
-static void iqs9151_inertia_work_cb(struct k_work *work) {
-    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
-    struct iqs9151_data *data = CONTAINER_OF(dwork, struct iqs9151_data, inertia_work);
-    const struct device *dev = data->dev;
+static bool iqs9151_inertia_step(struct iqs9151_inertia_state *state,
+                                 const struct iqs9151_inertia_params *params,
+                                 int32_t *out_x, int32_t *out_y) {
     int64_t now;
     int64_t dt_ms;
     uint32_t steps;
 
-    if (!data->inertia_active) {
-        return;
+    if (!state->active) {
+        *out_x = 0;
+        *out_y = 0;
+        return false;
     }
 
     now = k_uptime_get();
-    dt_ms = now - data->inertia_last_ms;
+    dt_ms = now - state->last_ms;
     if (dt_ms <= 0) {
-        dt_ms = INERTIA_INTERVAL_MS;
+        dt_ms = params->interval_ms;
     }
-    steps = (uint32_t)((dt_ms + INERTIA_INTERVAL_MS - 1) / INERTIA_INTERVAL_MS);
+    steps = (uint32_t)((dt_ms + params->interval_ms - 1) / params->interval_ms);
     if (steps == 0U) {
         steps = 1U;
     }
 
     for (uint32_t i = 0U; i < steps; i++) {
-        data->inertia_accum_x_fp += data->inertia_vx_fp;
-        data->inertia_accum_y_fp += data->inertia_vy_fp;
-        data->inertia_vx_fp =
-            (data->inertia_vx_fp * INERTIA_DECAY_NUM) / INERTIA_DECAY_DEN;
-        data->inertia_vy_fp =
-            (data->inertia_vy_fp * INERTIA_DECAY_NUM) / INERTIA_DECAY_DEN;
+        state->accum_x_fp += state->vx_fp;
+        state->accum_y_fp += state->vy_fp;
+        state->vx_fp = (state->vx_fp * params->decay_num) / params->decay_den;
+        state->vy_fp = (state->vy_fp * params->decay_num) / params->decay_den;
     }
 
-    data->inertia_last_ms = now;
-    data->inertia_elapsed_ms += steps * INERTIA_INTERVAL_MS;
+    state->last_ms = now;
+    state->elapsed_ms += steps * params->interval_ms;
 
-    int32_t out_x = data->inertia_accum_x_fp >> INERTIA_FP_SHIFT;
-    int32_t out_y = data->inertia_accum_y_fp >> INERTIA_FP_SHIFT;
-    data->inertia_accum_x_fp -= out_x << INERTIA_FP_SHIFT;
-    data->inertia_accum_y_fp -= out_y << INERTIA_FP_SHIFT;
+    *out_x = state->accum_x_fp >> params->fp_shift;
+    *out_y = state->accum_y_fp >> params->fp_shift;
+    state->accum_x_fp -= (*out_x) << params->fp_shift;
+    state->accum_y_fp -= (*out_y) << params->fp_shift;
+
+    const int32_t min_v_fp = (int32_t)(params->min_velocity << params->fp_shift);
+    if (state->elapsed_ms >= params->max_duration_ms ||
+        (iqs9151_abs32(state->vx_fp) < min_v_fp &&
+         iqs9151_abs32(state->vy_fp) < min_v_fp)) {
+        state->active = false;
+        return false;
+    }
+
+    return true;
+}
+
+static void iqs9151_inertia_scroll_work_cb(struct k_work *work) {
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct iqs9151_data *data =
+        CONTAINER_OF(dwork, struct iqs9151_data, inertia_scroll_work);
+    const struct device *dev = data->dev;
+    int32_t out_x;
+    int32_t out_y;
+
+    const bool active =
+        iqs9151_inertia_step(&data->inertia_scroll, &iqs9151_scroll_params, &out_x, &out_y);
 
     if (out_x > INT16_MAX) {
         out_x = INT16_MAX;
@@ -668,15 +735,47 @@ static void iqs9151_inertia_work_cb(struct k_work *work) {
         input_report_rel(dev, INPUT_REL_WHEEL, (int16_t)out_y, true, K_NO_WAIT);
     }
 
-    const int32_t min_v_fp = (int32_t)(INERTIA_MIN_VELOCITY << INERTIA_FP_SHIFT);
-    if (data->inertia_elapsed_ms >= INERTIA_MAX_DURATION_MS ||
-        (iqs9151_abs32(data->inertia_vx_fp) < min_v_fp &&
-         iqs9151_abs32(data->inertia_vy_fp) < min_v_fp)) {
-        iqs9151_inertia_cancel(data);
-        return;
+    if (active) {
+        k_work_schedule(&data->inertia_scroll_work,
+                        K_MSEC(iqs9151_scroll_params.interval_ms));
+    }
+}
+
+static void iqs9151_inertia_cursor_work_cb(struct k_work *work) {
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+    struct iqs9151_data *data =
+        CONTAINER_OF(dwork, struct iqs9151_data, inertia_cursor_work);
+    const struct device *dev = data->dev;
+    int32_t out_x;
+    int32_t out_y;
+
+    const bool active =
+        iqs9151_inertia_step(&data->inertia_cursor, &iqs9151_cursor_params, &out_x, &out_y);
+
+    if (out_x > INT16_MAX) {
+        out_x = INT16_MAX;
+    } else if (out_x < INT16_MIN) {
+        out_x = INT16_MIN;
+    }
+    if (out_y > INT16_MAX) {
+        out_y = INT16_MAX;
+    } else if (out_y < INT16_MIN) {
+        out_y = INT16_MIN;
     }
 
-    k_work_schedule(&data->inertia_work, K_MSEC(INERTIA_INTERVAL_MS));
+    const bool have_x = out_x != 0;
+    const bool have_y = out_y != 0;
+    if (have_x) {
+        input_report_rel(dev, INPUT_REL_X, (int16_t)out_x, !have_y, K_NO_WAIT);
+    }
+    if (have_y) {
+        input_report_rel(dev, INPUT_REL_Y, (int16_t)out_y, true, K_NO_WAIT);
+    }
+
+    if (active) {
+        k_work_schedule(&data->inertia_cursor_work,
+                        K_MSEC(iqs9151_cursor_params.interval_ms));
+    }
 }
 
 static void iqs9151_work_cb(struct k_work *work) {
@@ -698,28 +797,37 @@ static void iqs9151_work_cb(struct k_work *work) {
     iqs9151_parse_frame(raw_frame, &frame);
     prev_frame = data->prev_frame;
 
-    // Cancel Inertial Scrolling
     const bool prev_hscroll = (prev_frame.two_finger_gestures & BIT(7)) != 0U;
     const bool prev_vscroll = (prev_frame.two_finger_gestures & BIT(6)) != 0U;
     const bool curr_hscroll = (frame.two_finger_gestures & BIT(7)) != 0U;
     const bool curr_vscroll = (frame.two_finger_gestures & BIT(6)) != 0U;
     const bool scroll_started = (!prev_hscroll && !prev_vscroll) && (curr_hscroll || curr_vscroll);
     const bool scroll_ended   = (prev_hscroll || prev_vscroll) && !curr_hscroll && !curr_vscroll;
-    if (scroll_started || frame.finger_count == 2U) {
-        iqs9151_scroll_hist_reset(data);
-        if (data->inertia_active) {
-            iqs9151_inertia_cancel(data);
-        }
-    }
+    const bool cursor_moving =
+        (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED) != 0U;
 
     if (frame.info_flags & IQS9151_INFO_SHOW_RESET) {
         /* TODO: handle reset indication if needed */
         return;
     }
 
+    if (scroll_ended || (prev_frame.finger_count == 2U && frame.finger_count <= 1U)) {
+        data->cursor_guard_frames = CURSOR_GUARD_FRAMES;
+        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+        iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+    }
+    const bool cursor_guard_active = data->cursor_guard_frames > 0U;
+
     // ThreeFingerGestures(Custom)
     const bool three_candidate = (frame.finger_count == 3U) || data->three_active;
-    const bool three_consumed = three_candidate ? iqs9151_three_finger_update(data, &frame, &prev_frame, dev) : false;
+    if (three_candidate) {
+        iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
+        iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+        iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    }
+    const bool three_consumed =
+        three_candidate ? iqs9151_three_finger_update(data, &frame, &prev_frame, dev) : false;
 
     uint16_t single = frame.single_gestures;
     uint16_t two = frame.two_finger_gestures;
@@ -734,6 +842,10 @@ static void iqs9151_work_cb(struct k_work *work) {
         if (single != 0U) {
             const bool single_tap = (single & BIT(0)) != 0U;
             const bool press_hold = (single & BIT(3)) != 0U;
+
+            if (press_hold) {
+                iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+            }
 
             if (single_tap) {
                 LOG_DBG("Single Tap Event occurred!");
@@ -762,13 +874,9 @@ static void iqs9151_work_cb(struct k_work *work) {
             }
             if (curr_hscroll) {
                 input_report_rel(dev, INPUT_REL_HWHEEL, frame.gesture_x, !curr_vscroll, K_NO_WAIT);
-                iqs9151_scroll_hist_push(data->scroll_hist_x, &data->scroll_hist_pos_x,
-                                         &data->scroll_hist_count_x, frame.gesture_x);
             }
             if (curr_vscroll) {
                 input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_y, true, K_NO_WAIT);
-                iqs9151_scroll_hist_push(data->scroll_hist_y, &data->scroll_hist_pos_y,
-                                         &data->scroll_hist_count_y, frame.gesture_y);
             }
 
             // TODO ピンチインピンチアウト処理を実装する
@@ -776,7 +884,8 @@ static void iqs9151_work_cb(struct k_work *work) {
         }
 
     // TP Movement to XY Relative
-    } else if (!three_consumed && (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED)) {
+    } else if (!three_consumed && !cursor_guard_active &&
+               (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED)) {
 
         input_report_rel(dev, INPUT_REL_X, frame.rel_x, false, K_NO_WAIT);
         input_report_rel(dev, INPUT_REL_Y, frame.rel_y, true, K_NO_WAIT);
@@ -793,6 +902,9 @@ static void iqs9151_work_cb(struct k_work *work) {
     if (data->three_guard_frames > 0U) {
         data->three_guard_frames--;
     }
+    if (data->cursor_guard_frames > 0U) {
+        data->cursor_guard_frames--;
+    }
 
     // Release Button for Press And Hold
     if (frame.finger_count == 0U &&
@@ -800,19 +912,46 @@ static void iqs9151_work_cb(struct k_work *work) {
         input_report_key(dev, INPUT_BTN_0, false, true, K_NO_WAIT);
     }
 
+    if (scroll_started || frame.finger_count == 2U) {
+        iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+        iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
+    }
+
+    if (curr_hscroll || curr_vscroll) {
+        const int16_t sample_x = curr_hscroll ? frame.gesture_x : 0;
+        const int16_t sample_y = curr_vscroll ? frame.gesture_y : 0;
+        iqs9151_ema_update(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp,
+                           sample_x, sample_y, iqs9151_scroll_params.ema_alpha);
+    }
+
+    const bool finger1_started =
+        (prev_frame.finger_count == 0U) && (frame.finger_count == 1U);
+    if (finger1_started) {
+        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    }
+    if (frame.finger_count == 1U && cursor_moving && !cursor_guard_active) {
+        iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+        iqs9151_ema_update(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp,
+                           frame.rel_x, frame.rel_y, iqs9151_cursor_params.ema_alpha);
+    }
+
+    const bool prev_press_hold =
+        ((prev_frame.single_gestures & BIT(3)) != 0U);
+    const bool cursor_released =
+        (prev_frame.finger_count == 1U) && (frame.finger_count == 0U);
+    if (cursor_released && !prev_press_hold && !cursor_guard_active) {
+        iqs9151_inertia_start(&data->inertia_cursor, &data->inertia_cursor_work,
+                              &iqs9151_cursor_params,
+                              data->cursor_ema_x_fp, data->cursor_ema_y_fp);
+        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    }
+
     // Inertial Scrolling
     if (scroll_ended) {
-        int32_t avg_x = iqs9151_scroll_hist_weighted_avg(
-            data->scroll_hist_x, data->scroll_hist_pos_x, data->scroll_hist_count_x);
-        int32_t avg_y = iqs9151_scroll_hist_weighted_avg(
-            data->scroll_hist_y, data->scroll_hist_pos_y, data->scroll_hist_count_y);
-        int32_t start_x = (iqs9151_abs32(avg_x) >= INERTIA_START_THRESHOLD) ? avg_x : 0;
-        int32_t start_y = (iqs9151_abs32(avg_y) >= INERTIA_START_THRESHOLD) ? avg_y : 0;
-
-        if (start_x != 0 || start_y != 0) {
-            iqs9151_inertia_start(data, start_x, start_y);
-        }
-        iqs9151_scroll_hist_reset(data);
+        iqs9151_inertia_start(&data->inertia_scroll, &data->inertia_scroll_work,
+                              &iqs9151_scroll_params,
+                              data->scroll_ema_x_fp, data->scroll_ema_y_fp);
+        iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
     }
     iqs9151_update_prev_frame(data, &frame, &prev_frame);
 }
@@ -1071,10 +1210,14 @@ static int iqs9151_init(const struct device *dev) {
 
     // Setup IRQ Call Back
     k_work_init(&data->work, iqs9151_work_cb);
-    k_work_init_delayable(&data->inertia_work, iqs9151_inertia_work_cb);
-    iqs9151_scroll_hist_reset(data);
-    data->inertia_active = false;
+    k_work_init_delayable(&data->inertia_scroll_work, iqs9151_inertia_scroll_work_cb);
+    k_work_init_delayable(&data->inertia_cursor_work, iqs9151_inertia_cursor_work_cb);
+    iqs9151_inertia_state_reset(&data->inertia_scroll);
+    iqs9151_inertia_state_reset(&data->inertia_cursor);
+    iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+    iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
     iqs9151_three_finger_reset(data);
+    data->cursor_guard_frames = 0U;
     gpio_init_callback(&data->gpio_cb, iqs9151_gpio_cb,
                         BIT(cfg->irq_gpio.pin));
     ret = gpio_add_callback(cfg->irq_gpio.port, &data->gpio_cb);
