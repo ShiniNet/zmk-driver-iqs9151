@@ -115,6 +115,7 @@ struct iqs9151_data {
     uint16_t three_last_y;
     uint8_t three_guard_frames;
     uint8_t cursor_guard_frames;
+    bool hold_active;
 };
 
 static const uint8_t iqs9151_alp_compensation[] = {
@@ -544,6 +545,15 @@ static void iqs9151_inertia_cancel(struct iqs9151_inertia_state *state,
     k_work_cancel_delayable(work);
 }
 
+static void iqs9151_release_hold(struct iqs9151_data *data, const struct device *dev) {
+    if (!data->hold_active) {
+        return;
+    }
+
+    input_report_key(dev, INPUT_BTN_0, false, true, K_NO_WAIT);
+    data->hold_active = false;
+}
+
 static void iqs9151_three_finger_reset(struct iqs9151_data *data) {
     data->three_active = false;
     data->three_hold_sent = false;
@@ -620,6 +630,7 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         if (elapsed <= THREE_FINGER_TAP_TIME_MS &&
             iqs9151_abs32(data->three_dx) <= THREE_FINGER_TAP_MOVE &&
             iqs9151_abs32(data->three_dy) <= THREE_FINGER_TAP_MOVE) {
+            iqs9151_release_hold(data, dev);
             input_report_key(dev, INPUT_BTN_2, true, true, K_FOREVER);
             input_report_key(dev, INPUT_BTN_2, false, true, K_FOREVER);
         }
@@ -849,6 +860,7 @@ static void iqs9151_work_cb(struct k_work *work) {
 
             if (single_tap) {
                 LOG_DBG("Single Tap Event occurred!");
+                iqs9151_release_hold(data, dev);
                 input_report_key(dev, INPUT_BTN_0, true, true, K_FOREVER);
                 input_report_key(dev, INPUT_BTN_0, false, true, K_FOREVER);
 
@@ -857,8 +869,9 @@ static void iqs9151_work_cb(struct k_work *work) {
                 const bool prev_press_hold =
                     ((data->prev_frame.single_gestures & BIT(3)) != 0U);
 
-                if (!prev_press_hold) {
+                if (!prev_press_hold && !data->hold_active) {
                     input_report_key(dev, INPUT_BTN_0, true, true, K_FOREVER);
+                    data->hold_active = true;
                 } else if ((frame.gesture_x != 0) || (frame.gesture_y != 0)) {
                     input_report_rel(dev, INPUT_REL_X, frame.gesture_x, false, K_NO_WAIT);
                     input_report_rel(dev, INPUT_REL_Y, frame.gesture_y, true, K_NO_WAIT);
@@ -869,6 +882,7 @@ static void iqs9151_work_cb(struct k_work *work) {
         if (two != 0U) {
 
             if ((two & BIT(0)) != 0U) {
+                iqs9151_release_hold(data, dev);
                 input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
                 input_report_key(dev, INPUT_BTN_1, false, true, K_FOREVER);
             }
@@ -906,24 +920,17 @@ static void iqs9151_work_cb(struct k_work *work) {
         data->cursor_guard_frames--;
     }
 
-    // Release Button for Press And Hold
-    if (frame.finger_count == 0U &&
-        ((data->prev_frame.single_gestures & BIT(3)) != 0U)) {
-        input_report_key(dev, INPUT_BTN_0, false, true, K_NO_WAIT);
-    }
-
+    // Cancel Inertial 
     if (scroll_started || frame.finger_count == 2U) {
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
         iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
     }
-
     if (curr_hscroll || curr_vscroll) {
         const int16_t sample_x = curr_hscroll ? frame.gesture_x : 0;
         const int16_t sample_y = curr_vscroll ? frame.gesture_y : 0;
         iqs9151_ema_update(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp,
                            sample_x, sample_y, iqs9151_scroll_params.ema_alpha);
     }
-
     const bool finger1_started =
         (prev_frame.finger_count == 0U) && (frame.finger_count == 1U);
     if (finger1_started) {
@@ -935,6 +942,7 @@ static void iqs9151_work_cb(struct k_work *work) {
                            frame.rel_x, frame.rel_y, iqs9151_cursor_params.ema_alpha);
     }
 
+    // Inertial Cursolling
     const bool prev_press_hold =
         ((prev_frame.single_gestures & BIT(3)) != 0U);
     const bool cursor_released =
@@ -1218,6 +1226,7 @@ static int iqs9151_init(const struct device *dev) {
     iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
     iqs9151_three_finger_reset(data);
     data->cursor_guard_frames = 0U;
+    data->hold_active = false;
     gpio_init_callback(&data->gpio_cb, iqs9151_gpio_cb,
                         BIT(cfg->irq_gpio.pin));
     ret = gpio_add_callback(cfg->irq_gpio.port, &data->gpio_cb);
