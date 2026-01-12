@@ -37,7 +37,8 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 #define INERTIA_START_THRESHOLD 1
 #define INERTIA_MIN_VELOCITY 1
 #define THREE_FINGER_TAP_TIME_MS 150
-#define THREE_FINGER_TAP_MOVE 12
+#define THREE_FINGER_TAP_MOVE 25
+#define THREE_FINGER_TAP_GUARD_FRAMES 5
 #define THREE_FINGER_HOLD_TIME_MS 300
 #define THREE_FINGER_HOLD_MOVE 30
 #define THREE_FINGER_SWIPE_DIST 300
@@ -87,6 +88,7 @@ struct iqs9151_data {
     int32_t three_dy;
     uint16_t three_last_x;
     uint16_t three_last_y;
+    uint8_t three_guard_frames;
 };
 
 static const uint8_t iqs9151_alp_compensation[] = {
@@ -560,7 +562,7 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         if (!data->three_swipe_sent && !data->three_hold_sent) {
             if (iqs9151_abs32(data->three_dx) >= THREE_FINGER_SWIPE_DIST &&
                 iqs9151_abs32(data->three_dx) >= iqs9151_abs32(data->three_dy)) {
-                uint16_t key = (data->three_dx < 0) ? INPUT_BTN_3 : INPUT_BTN_4;
+                uint16_t key = (data->three_dx < 0) ? INPUT_BTN_4 : INPUT_BTN_3;
                 input_report_key(dev, key, true, true, K_FOREVER);
                 input_report_key(dev, key, false, true, K_FOREVER);
                 data->three_swipe_sent = true;
@@ -591,6 +593,7 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         }
     }
 
+    data->three_guard_frames = THREE_FINGER_TAP_GUARD_FRAMES;
     iqs9151_three_finger_reset(data);
     return true;
 }
@@ -714,14 +717,21 @@ static void iqs9151_work_cb(struct k_work *work) {
         return;
     }
 
+    // ThreeFingerGestures(Custom)
     const bool three_candidate = (frame.finger_count == 3U) || data->three_active;
-    const bool three_consumed =
-        three_candidate ? iqs9151_three_finger_update(data, &frame, &prev_frame, dev) : false;
+    const bool three_consumed = three_candidate ? iqs9151_three_finger_update(data, &frame, &prev_frame, dev) : false;
 
-    if (!three_consumed && (frame.single_gestures != 0U || frame.two_finger_gestures != 0U)) {
+    uint16_t single = frame.single_gestures;
+    uint16_t two = frame.two_finger_gestures;
+    const bool tap_guard = data->three_guard_frames > 0U;
+    if (tap_guard) {
+        single &= (uint16_t)~BIT(0);
+        two &= (uint16_t)~BIT(0);
+    }
+
+    if (!three_consumed && (single != 0U || two != 0U)) {
         // SingleFingerGestures
-        if (frame.single_gestures != 0U) {
-            const uint16_t single = frame.single_gestures;
+        if (single != 0U) {
             const bool single_tap = (single & BIT(0)) != 0U;
             const bool press_hold = (single & BIT(3)) != 0U;
 
@@ -744,9 +754,9 @@ static void iqs9151_work_cb(struct k_work *work) {
             }
         }
         // TwoFinger Gestures
-        if (frame.two_finger_gestures != 0U) {
+        if (two != 0U) {
 
-            if ((frame.two_finger_gestures & BIT(0)) != 0U) {
+            if ((two & BIT(0)) != 0U) {
                 input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
                 input_report_key(dev, INPUT_BTN_1, false, true, K_FOREVER);
             }
@@ -775,10 +785,15 @@ static void iqs9151_work_cb(struct k_work *work) {
         /* TODO: no movement/gesture; optionally handle idle state */
     }
 
-    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u",
+    LOG_DBG("rel x=%d y=%d ges x=%d y=%d info=0x%04x tp=0x%04x sGes=0x%04x tGes=0x%04x finger=%d f1x=%u f1y=%u",
             frame.rel_x, frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
-            frame.trackpad_flags, frame.finger_count, frame.finger1_x, frame.finger1_y);
+            frame.trackpad_flags,frame.single_gestures,frame.two_finger_gestures,
+            frame.finger_count, frame.finger1_x, frame.finger1_y);
     
+    if (data->three_guard_frames > 0U) {
+        data->three_guard_frames--;
+    }
+
     // Release Button for Press And Hold
     if (frame.finger_count == 0U &&
         ((data->prev_frame.single_gestures & BIT(3)) != 0U)) {
