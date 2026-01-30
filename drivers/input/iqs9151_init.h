@@ -10,37 +10,37 @@
 
 /* ALP ATI Compensation */
 /* Memory Map Position 0x115C - 0x1175 */
-#define ALP_COMPENSATION_RX0_0                   0xB4
+#define ALP_COMPENSATION_RX0_0                   0xB1
 #define ALP_COMPENSATION_RX0_1                   0x12
-#define ALP_COMPENSATION_RX1_0                   0xAC
+#define ALP_COMPENSATION_RX1_0                   0xDE
 #define ALP_COMPENSATION_RX1_1                   0x12
-#define ALP_COMPENSATION_RX2_0                   0xB2
+#define ALP_COMPENSATION_RX2_0                   0xCB
 #define ALP_COMPENSATION_RX2_1                   0x12
-#define ALP_COMPENSATION_RX3_0                   0xBF
+#define ALP_COMPENSATION_RX3_0                   0xB5
 #define ALP_COMPENSATION_RX3_1                   0x12
-#define ALP_COMPENSATION_RX4_0                   0xC5
+#define ALP_COMPENSATION_RX4_0                   0xA1
 #define ALP_COMPENSATION_RX4_1                   0x12
-#define ALP_COMPENSATION_RX5_0                   0xB8
+#define ALP_COMPENSATION_RX5_0                   0xD1
 #define ALP_COMPENSATION_RX5_1                   0x12
-#define ALP_COMPENSATION_RX6_0                   0xD7
+#define ALP_COMPENSATION_RX6_0                   0xA8
 #define ALP_COMPENSATION_RX6_1                   0x12
-#define ALP_COMPENSATION_RX7_0                   0xC0
+#define ALP_COMPENSATION_RX7_0                   0xB8
 #define ALP_COMPENSATION_RX7_1                   0x12
-#define ALP_COMPENSATION_RX8_0                   0xA7
+#define ALP_COMPENSATION_RX8_0                   0xB3
 #define ALP_COMPENSATION_RX8_1                   0x12
-#define ALP_COMPENSATION_RX9_0                   0xD1
+#define ALP_COMPENSATION_RX9_0                   0xC6
 #define ALP_COMPENSATION_RX9_1                   0x12
-#define ALP_COMPENSATION_RX10_0                  0xA4
+#define ALP_COMPENSATION_RX10_0                  0xA6
 #define ALP_COMPENSATION_RX10_1                  0x12
-#define ALP_COMPENSATION_RX11_0                  0xB6
+#define ALP_COMPENSATION_RX11_0                  0xAF
 #define ALP_COMPENSATION_RX11_1                  0x12
-#define ALP_COMPENSATION_RX12_0                  0xA1
+#define ALP_COMPENSATION_RX12_0                  0xAD
 #define ALP_COMPENSATION_RX12_1                  0x12
 
 /* I2C Slave Address */
 /* Memory Map Position 0x1176 - 0x1177 */
 #define I2C_KEY                                  0xFF
-#define I2C_SLAVE_ADR                            0x56
+#define I2C_SLAVE_ADR                            0xFF
 
 /* Settings Version Numbers */
 /* Memory Map Position 0x1178 - 0x1179 */
@@ -50,11 +50,11 @@
 /* ATI Multipliers / Dividers */
 /* Memory Map Position 0x117A - 0x1195 */
 #define TP_ATI_MULTDIV_L                         0x21
-#define TP_ATI_MULTDIV_H                         0x4D
+#define TP_ATI_MULTDIV_H                         0x4B
 #define ALP_ATI_COARSE_RX0_L                     0x04
 #define ALP_ATI_COARSE_RX0_H                     0x5F
 #define ALP_ATI_COARSE_RX1_L                     0x04
-#define ALP_ATI_COARSE_RX1_H                     0x5F
+#define ALP_ATI_COARSE_RX1_H                     0x5D
 #define ALP_ATI_COARSE_RX2_L                     0x04
 #define ALP_ATI_COARSE_RX2_H                     0x5D
 #define ALP_ATI_COARSE_RX3_L                     0x04
@@ -62,26 +62,26 @@
 #define ALP_ATI_COARSE_RX4_L                     0x04
 #define ALP_ATI_COARSE_RX4_H                     0x5D
 #define ALP_ATI_COARSE_RX5_L                     0x04
-#define ALP_ATI_COARSE_RX5_H                     0x5F
+#define ALP_ATI_COARSE_RX5_H                     0x5D
 #define ALP_ATI_COARSE_RX6_L                     0x04
-#define ALP_ATI_COARSE_RX6_H                     0x5B
+#define ALP_ATI_COARSE_RX6_H                     0x5F
 #define ALP_ATI_COARSE_RX7_L                     0x04
-#define ALP_ATI_COARSE_RX7_H                     0x5F
+#define ALP_ATI_COARSE_RX7_H                     0x5D
 #define ALP_ATI_COARSE_RX8_L                     0x04
-#define ALP_ATI_COARSE_RX8_H                     0x5F
+#define ALP_ATI_COARSE_RX8_H                     0x5D
 #define ALP_ATI_COARSE_RX9_L                     0x04
-#define ALP_ATI_COARSE_RX9_H                     0x5B
+#define ALP_ATI_COARSE_RX9_H                     0x5D
 #define ALP_ATI_COARSE_RX10_L                    0x04
-#define ALP_ATI_COARSE_RX10_H                    0x5D
+#define ALP_ATI_COARSE_RX10_H                    0x5F
 #define ALP_ATI_COARSE_RX11_L                    0x04
-#define ALP_ATI_COARSE_RX11_H                    0x5D
-#define ALP_ATI_COARSE_RX12_L                    0x04
+#define ALP_ATI_COARSE_RX11_H                    0x5F
+#define ALP_ATI_COARSE_RX12_L                    0x02
 #define ALP_ATI_COARSE_RX12_H                    0x5F
 
 /* ATI Settings */
 /* Memory Map Position 0x1196 - 0x11A1 */
-#define TP_ATI_TARGET_0                          0xDC
-#define TP_ATI_TARGET_1                          0x00
+#define TP_ATI_TARGET_0                          0x90 // 0xFA
+#define TP_ATI_TARGET_1                          0x01 // 0x00
 #define ALP_ATI_TARGET_0                         0x2C
 #define ALP_ATI_TARGET_1                         0x01
 #define ALP_BASE_TARGET_0                        0x32
@@ -95,7 +95,7 @@
 
 /* Sampling Periods and Timing */
 /* Memory Map Position 0x11A2 - 0x11BB */
-#define ACTIVE_MODE_SAMPLING_PERIOD_0            0x0A // 0x05
+#define ACTIVE_MODE_SAMPLING_PERIOD_0            0x0A // 0x0A
 #define ACTIVE_MODE_SAMPLING_PERIOD_1            0x00
 #define IDLE_TOUCH_MODE_SAMPLING_PERIOD_0        0x32
 #define IDLE_TOUCH_MODE_SAMPLING_PERIOD_1        0x00
@@ -103,7 +103,7 @@
 #define IDLE_MODE_SAMPLING_PERIOD_1              0x00
 #define LP1_MODE_SAMPLING_PERIOD_0               0x32
 #define LP1_MODE_SAMPLING_PERIOD_1               0x00
-#define LP2_MODE_SAMPLING_PERIOD_0               0x64
+#define LP2_MODE_SAMPLING_PERIOD_0               0x32
 #define LP2_MODE_SAMPLING_PERIOD_1               0x00
 #define STATIONARY_TOUCH_TIMEOUT_0               0x0A
 #define STATIONARY_TOUCH_TIMEOUT_1               0x00
@@ -142,11 +142,11 @@
 #define ALP_TX_ENABLE_2                          0x00
 #define ALP_TX_ENABLE_3                          0x00
 #define ALP_TX_ENABLE_4                          0xFE
-#define ALP_TX_ENABLE_5                          0x2F
+#define ALP_TX_ENABLE_5                          0x0F
 
 /* Thresholds and Debounce Settings */
 /* Memory Map Position 0x11CC - 0x11D3 */
-#define TRACKPAD_TOUCH_SET_THRESHOLD             0x1E
+#define TRACKPAD_TOUCH_SET_THRESHOLD             0x1E // 0x1E
 #define TRACKPAD_TOUCH_CLEAR_THRESHOLD           0x1A
 #define ALP_THRESHOLD                            0x08
 #define ALP_AUTOPROX_THRESHOLD                   0x08
@@ -177,14 +177,14 @@
 
 /* Trackpad Settings */
 /* Memory Map Position 0x11E2 - 0x11F5 */
-#define TRACKPAD_SETTINGS_0_0                    0x28 // 0x28
-#define TRACKPAD_SETTINGS_0_1                    0x0D
-#define TRACKPAD_SETTINGS_1_0                    0x0C
+#define TRACKPAD_SETTINGS_0_0                    0x28
+#define TRACKPAD_SETTINGS_0_1                    0x0C
+#define TRACKPAD_SETTINGS_1_0                    0x0D
 #define TRACKPAD_SETTINGS_1_1                    0x03
-#define X_RESOLUTION_0                           0x00
-#define X_RESOLUTION_1                           0x0C
-#define Y_RESOLUTION_0                           0x01
-#define Y_RESOLUTION_1                           0x0B
+#define X_RESOLUTION_0                           0x99
+#define X_RESOLUTION_1                           0x09
+#define Y_RESOLUTION_0                           0x00
+#define Y_RESOLUTION_1                           0x0C
 #define XY_DYNAMIC_FILTER_BOTTOM_SPEED_0         0x14
 #define XY_DYNAMIC_FILTER_BOTTOM_SPEED_1         0x00
 #define XY_DYNAMIC_FILTER_TOP_SPEED_0            0xFF
@@ -237,31 +237,31 @@
 
 /* Rx/Tx Mapping */
 /* Memory Map Position 0x1218 - 0x1245 */
-#define RX_TX_MAP_0                              0x07
-#define RX_TX_MAP_1                              0x08
-#define RX_TX_MAP_2                              0x0C
-#define RX_TX_MAP_3                              0x0B
-#define RX_TX_MAP_4                              0x0A
-#define RX_TX_MAP_5                              0x09
+#define RX_TX_MAP_0                              0x00
+#define RX_TX_MAP_1                              0x01
+#define RX_TX_MAP_2                              0x02
+#define RX_TX_MAP_3                              0x03
+#define RX_TX_MAP_4                              0x04
+#define RX_TX_MAP_5                              0x05
 #define RX_TX_MAP_6                              0x06
-#define RX_TX_MAP_7                              0x02
-#define RX_TX_MAP_8                              0x03
-#define RX_TX_MAP_9                              0x04
-#define RX_TX_MAP_10                             0x05
-#define RX_TX_MAP_11                             0x01
-#define RX_TX_MAP_12                             0x00
-#define RX_TX_MAP_13                             0x22
+#define RX_TX_MAP_7                              0x07
+#define RX_TX_MAP_8                              0x08
+#define RX_TX_MAP_9                              0x09
+#define RX_TX_MAP_10                             0x0A
+#define RX_TX_MAP_11                             0x0B
+#define RX_TX_MAP_12                             0x0C
+#define RX_TX_MAP_13                             0x21
 #define RX_TX_MAP_14                             0x23
-#define RX_TX_MAP_15                             0x25
-#define RX_TX_MAP_16                             0x26
-#define RX_TX_MAP_17                             0x29
-#define RX_TX_MAP_18                             0x2A
-#define RX_TX_MAP_19                             0x24
-#define RX_TX_MAP_20                             0x28
-#define RX_TX_MAP_21                             0x2B
-#define RX_TX_MAP_22                             0x2D
-#define RX_TX_MAP_23                             0x27
-#define RX_TX_MAP_24                             0x21
+#define RX_TX_MAP_15                             0x2D
+#define RX_TX_MAP_16                             0x22
+#define RX_TX_MAP_17                             0x24
+#define RX_TX_MAP_18                             0x25
+#define RX_TX_MAP_19                             0x26
+#define RX_TX_MAP_20                             0x27
+#define RX_TX_MAP_21                             0x28
+#define RX_TX_MAP_22                             0x29
+#define RX_TX_MAP_23                             0x2A
+#define RX_TX_MAP_24                             0x2B
 #define RX_TX_MAP_25                             0x00
 #define RX_TX_MAP_26                             0x00
 #define RX_TX_MAP_27                             0x00
@@ -287,7 +287,7 @@
 /* TP Channel Disables */
 /* Memory Map Position 0x1246 - 0x129D */
 #define TPCHANNELDISABLE_0                       0x01
-#define TPCHANNELDISABLE_1                       0x10
+#define TPCHANNELDISABLE_1                       0x08
 #define TPCHANNELDISABLE_2                       0x00
 #define TPCHANNELDISABLE_3                       0x00
 #define TPCHANNELDISABLE_4                       0x00
@@ -330,12 +330,12 @@
 #define TPCHANNELDISABLE_41                      0x00
 #define TPCHANNELDISABLE_42                      0x00
 #define TPCHANNELDISABLE_43                      0x00
-#define TPCHANNELDISABLE_44                      0x01
-#define TPCHANNELDISABLE_45                      0x10
+#define TPCHANNELDISABLE_44                      0x00
+#define TPCHANNELDISABLE_45                      0x00
 #define TPCHANNELDISABLE_46                      0x00
 #define TPCHANNELDISABLE_47                      0x00
-#define TPCHANNELDISABLE_48                      0x00
-#define TPCHANNELDISABLE_49                      0x00
+#define TPCHANNELDISABLE_48                      0x01
+#define TPCHANNELDISABLE_49                      0x08
 #define TPCHANNELDISABLE_50                      0x00
 #define TPCHANNELDISABLE_51                      0x00
 #define TPCHANNELDISABLE_52                      0x00
