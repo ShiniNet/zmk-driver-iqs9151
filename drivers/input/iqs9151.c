@@ -56,7 +56,7 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 #define THREE_FINGER_SWIPE_DIST 300
 
 struct iqs9151_config {
-    struct i2c_dt_spec bus;
+    struct i2c_dt_spec i2c;
     struct gpio_dt_spec irq_gpio;
     struct gpio_dt_spec reset_gpio;
 };
@@ -399,14 +399,14 @@ static int iqs9151_i2c_write(const struct iqs9151_config *cfg, uint16_t reg, con
 
     sys_put_le16(reg, tx);
     memcpy(&tx[2], buf, len);
-    return i2c_write_dt(&cfg->bus, tx, len + 2);
+    return i2c_write_dt(&cfg->i2c, tx, len + 2);
 }
 
 static int iqs9151_i2c_read(const struct iqs9151_config *cfg, uint16_t reg, uint8_t *buf, size_t len) {
     uint8_t addr_buf[2];
 
     sys_put_le16(reg, addr_buf);
-    return i2c_write_read_dt(&cfg->bus, addr_buf, sizeof(addr_buf), buf, len);
+    return i2c_write_read_dt(&cfg->i2c, addr_buf, sizeof(addr_buf), buf, len);
 }
 
 static void iqs9151_wait_for_ready(const struct device *dev, uint16_t timeout_ms) {
@@ -1095,7 +1095,6 @@ static int iqs9151_configure(const struct device *dev) {
 
     iqs9151_wait_for_ready(dev, 500);
 
-    LOG_DBG("Initial configuration start");
     ret = iqs9151_write_chunks(dev, cfg, IQS9151_ADDR_ALP_COMPENSATION,
                                     iqs9151_alp_compensation,
                                     ARRAY_SIZE(iqs9151_alp_compensation));
@@ -1132,7 +1131,6 @@ static int iqs9151_configure(const struct device *dev) {
     if (ret) {
         return ret;
     }
-    LOG_DBG("Initial configuration complete");
     return ret;
 }
 
@@ -1142,7 +1140,9 @@ static int iqs9151_init(const struct device *dev) {
     int ret;
     data->dev = dev;
 
-    if (!device_is_ready(cfg->bus.bus)) {
+    LOG_DBG("Initialization Start");
+
+    if (!device_is_ready(cfg->i2c.bus)) {
         LOG_ERR("I2C bus not ready");
         return -ENODEV;
     }
@@ -1173,15 +1173,15 @@ static int iqs9151_init(const struct device *dev) {
         return ret;
     }
 
-    // HW_RESET
-    ret = iqs9151_hw_reset(dev);
-    if (ret != 0) {
-        LOG_ERR("HW Reset failed (%d)", ret);
-        return ret;
-    }
-    LOG_DBG("Hardware RESET complete");
+    // // HW_RESET
+    // ret = iqs9151_hw_reset(dev);
+    // if (ret != 0) {
+    //     LOG_ERR("HW Reset failed (%d)", ret);
+    //     return ret;
+    // }
+    // LOG_DBG("Hardware RESET complete");
 
-    iqs9151_wait_for_ready(dev, 1000);
+    // iqs9151_wait_for_ready(dev, 1000);
 
     // Check Product Number
     ret = checkProductNumber(dev);
@@ -1263,7 +1263,7 @@ static int iqs9151_init(const struct device *dev) {
 
 #define IQS9151_INIT(inst)                                                \
     static const struct iqs9151_config iqs9151_config_##inst = {    \
-        .bus = I2C_DT_SPEC_INST_GET(inst),                                      \
+        .i2c = I2C_DT_SPEC_INST_GET(inst),                                      \
         .irq_gpio = GPIO_DT_SPEC_INST_GET(inst, irq_gpios),                     \
         .reset_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, reset_gpios, {0}),         \
   };                                                                          \

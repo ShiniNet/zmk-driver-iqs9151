@@ -126,7 +126,7 @@
 /* Memory Map Position 0x11BC - 0x11C1 */
 #define SYSTEM_CONTROL_0                         0x00
 #define SYSTEM_CONTROL_1                         0x00
-#define CONFIG_SETTINGS_0                        0x1E
+#define CONFIG_SETTINGS_0                        0x0E //0x1E
 #define CONFIG_SETTINGS_1                        0x06
 #define OTHER_SETTINGS_0                         0xA4
 #define OTHER_SETTINGS_1                         0x00
