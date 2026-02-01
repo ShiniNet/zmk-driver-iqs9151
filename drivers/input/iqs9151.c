@@ -116,6 +116,7 @@ struct iqs9151_data {
     uint8_t three_guard_frames;
     uint8_t cursor_guard_frames;
     uint16_t hold_button;
+    bool pinch_active;
 };
 
 static const uint8_t iqs9151_alp_compensation[] = {
@@ -816,6 +817,10 @@ static void iqs9151_work_cb(struct k_work *work) {
     const bool prev_vscroll = (prev_frame.two_finger_gestures & IQS9151_TFG_VSCROLL) != 0U;
     const bool curr_hscroll = (frame.two_finger_gestures & IQS9151_TFG_HSCROLL) != 0U;
     const bool curr_vscroll = (frame.two_finger_gestures & IQS9151_TFG_VSCROLL) != 0U;
+    const bool pinch_now =
+        (frame.two_finger_gestures & (IQS9151_TFG_ZOOM_IN | IQS9151_TFG_ZOOM_OUT)) != 0U;
+    const bool pinch_started = !data->pinch_active && pinch_now;
+    const bool pinch_ended = data->pinch_active && (!pinch_now || frame.finger_count < 2U);
     const bool scroll_started = (!prev_hscroll && !prev_vscroll) && (curr_hscroll || curr_vscroll);
     const bool scroll_ended   = (prev_hscroll || prev_vscroll) && !curr_hscroll && !curr_vscroll;
     const bool cursor_moving =
@@ -850,6 +855,13 @@ static void iqs9151_work_cb(struct k_work *work) {
     if (tap_guard) {
         single &= (uint16_t)~BIT(0);
         two &= (uint16_t)~BIT(0);
+    }
+
+    if (pinch_started) {
+        input_report_key(dev, INPUT_KEY_LEFTCTRL, true, true, K_FOREVER);
+    }
+    if (pinch_ended) {
+        input_report_key(dev, INPUT_KEY_LEFTCTRL, false, true, K_FOREVER);
     }
 
     if (!three_consumed && (single != 0U || two != 0U)) {
@@ -898,11 +910,15 @@ static void iqs9151_work_cb(struct k_work *work) {
                 input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
                 data->hold_button = INPUT_BTN_1;
             }
-            if (curr_hscroll) {
-                input_report_rel(dev, INPUT_REL_HWHEEL, frame.gesture_x, !curr_vscroll, K_NO_WAIT);
-            }
-            if (curr_vscroll) {
-                input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_y, true, K_NO_WAIT);
+            if (pinch_now) {
+                input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_x, true, K_NO_WAIT);
+            } else {
+                if (curr_hscroll) {
+                    input_report_rel(dev, INPUT_REL_HWHEEL, frame.gesture_x, !curr_vscroll, K_NO_WAIT);
+                }
+                if (curr_vscroll) {
+                    input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_y, true, K_NO_WAIT);
+                }
             }
         }
 
@@ -970,6 +986,11 @@ static void iqs9151_work_cb(struct k_work *work) {
                               data->scroll_ema_x_fp, data->scroll_ema_y_fp);
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
     }
+    if (pinch_now) {
+        iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
+        iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+    }
+    data->pinch_active = pinch_now && (frame.finger_count >= 2U);
     iqs9151_update_prev_frame(data, &frame, &prev_frame);
 }
 
