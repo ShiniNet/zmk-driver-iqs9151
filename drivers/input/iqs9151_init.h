@@ -202,7 +202,7 @@
 /* Memory Map Position 0x11F6 - 0x1217 */
 #define GESTURE_ENABLE_0                         0x19
 #define GESTURE_ENABLE_1                         0xFF
-#define GESTURE_ENABLE_2F_0                      0xFF
+#define GESTURE_ENABLE_2F_0                      0xF9
 #define GESTURE_ENABLE_2F_1                      0x00
 #define TAP_TOUCH_TIME_0                         0x96
 #define TAP_TOUCH_TIME_1                         0x00

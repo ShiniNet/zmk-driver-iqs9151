@@ -812,10 +812,10 @@ static void iqs9151_work_cb(struct k_work *work) {
     iqs9151_parse_frame(raw_frame, &frame);
     prev_frame = data->prev_frame;
 
-    const bool prev_hscroll = (prev_frame.two_finger_gestures & BIT(7)) != 0U;
-    const bool prev_vscroll = (prev_frame.two_finger_gestures & BIT(6)) != 0U;
-    const bool curr_hscroll = (frame.two_finger_gestures & BIT(7)) != 0U;
-    const bool curr_vscroll = (frame.two_finger_gestures & BIT(6)) != 0U;
+    const bool prev_hscroll = (prev_frame.two_finger_gestures & IQS9151_TFG_HSCROLL) != 0U;
+    const bool prev_vscroll = (prev_frame.two_finger_gestures & IQS9151_TFG_VSCROLL) != 0U;
+    const bool curr_hscroll = (frame.two_finger_gestures & IQS9151_TFG_HSCROLL) != 0U;
+    const bool curr_vscroll = (frame.two_finger_gestures & IQS9151_TFG_VSCROLL) != 0U;
     const bool scroll_started = (!prev_hscroll && !prev_vscroll) && (curr_hscroll || curr_vscroll);
     const bool scroll_ended   = (prev_hscroll || prev_vscroll) && !curr_hscroll && !curr_vscroll;
     const bool cursor_moving =
@@ -884,9 +884,8 @@ static void iqs9151_work_cb(struct k_work *work) {
         }
         // TwoFinger Gestures
         if (two != 0U) {
-            const bool two_tap = (two & BIT(0)) != 0U;
-            const bool two_press_hold = (two & BIT(3)) != 0U;
-
+            const bool two_tap = (two & IQS9151_TFG_TWO_TAP) != 0U;
+            const bool two_press_hold = (two & IQS9151_TFG_TWO_PRESS_HOLD) != 0U;
             if (two_tap) {
                 const bool had_hold = data->hold_button != 0U;
                 iqs9151_release_hold(data, dev);

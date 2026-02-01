@@ -58,6 +58,14 @@
 #define IQS9151_TP_FINGER_COUNT_MASK           BIT_MASK(4)
 #define IQS9151_TP_FINGER1_CONFIDENCE          BIT(8)
 
+/* Two-Finger Gestures bits (IQS9151_ADDR_TWO_FINGER_GESTURES) */
+#define IQS9151_TFG_TWO_TAP                    BIT(0)
+#define IQS9151_TFG_TWO_PRESS_HOLD             BIT(3)
+#define IQS9151_TFG_ZOOM_IN                    BIT(4)
+#define IQS9151_TFG_ZOOM_OUT                   BIT(5)
+#define IQS9151_TFG_VSCROLL                    BIT(6)
+#define IQS9151_TFG_HSCROLL                    BIT(7)
+
 /* System Control bits */
 #define IQS9151_SYS_CTRL_SW_RESET              BIT(9)
 #define IQS9151_SYS_CTRL_ACK_RESET             BIT(7)
