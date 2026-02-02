@@ -1,0 +1,6 @@
+menuconfig ZMK_BEHAVIOR_TRACKPAD_TO_POS
+    bool "Trackpad to position behavior"
+    default y
+    help
+      Enable the trackpad-to-position behavior that raises position_state_changed
+      events for a virtual key position.
