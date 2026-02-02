@@ -751,7 +751,7 @@ static void iqs9151_inertia_scroll_work_cb(struct k_work *work) {
     const bool have_x = out_x != 0;
     const bool have_y = out_y != 0;
     if (have_x) {
-        input_report_rel(dev, INPUT_REL_HWHEEL, (int16_t)out_x, !have_y, K_NO_WAIT);
+        input_report_rel(dev, INPUT_REL_HWHEEL, (int16_t)(-out_x), !have_y, K_NO_WAIT);
     }
     if (have_y) {
         input_report_rel(dev, INPUT_REL_WHEEL, (int16_t)out_y, true, K_NO_WAIT);
@@ -920,7 +920,7 @@ static void iqs9151_work_cb(struct k_work *work) {
                 input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_x, true, K_NO_WAIT);
             } else {
                 if (curr_hscroll) {
-                    input_report_rel(dev, INPUT_REL_HWHEEL, frame.gesture_x, !curr_vscroll, K_NO_WAIT);
+                    input_report_rel(dev, INPUT_REL_HWHEEL, (int16_t)(-frame.gesture_x), !curr_vscroll, K_NO_WAIT);
                 }
                 if (curr_vscroll) {
                     input_report_rel(dev, INPUT_REL_WHEEL, frame.gesture_y, true, K_NO_WAIT);
