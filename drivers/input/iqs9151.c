@@ -605,13 +605,13 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         if (!data->three_swipe_sent && !data->three_hold_sent) {
             if (iqs9151_abs32(data->three_dx) >= THREE_FINGER_SWIPE_DIST &&
                 iqs9151_abs32(data->three_dx) >= iqs9151_abs32(data->three_dy)) {
-                uint16_t key = (data->three_dx < 0) ? INPUT_KEY_F13 : INPUT_KEY_F14;
+                uint16_t key = (data->three_dx < 0) ? INPUT_BTN_3 : INPUT_BTN_4;
                 input_report_key(dev, key, true, true, K_FOREVER);
                 input_report_key(dev, key, false, true, K_FOREVER);
                 data->three_swipe_sent = true;
             } else if (iqs9151_abs32(data->three_dy) >= THREE_FINGER_SWIPE_DIST &&
                        iqs9151_abs32(data->three_dy) > iqs9151_abs32(data->three_dx)) {
-                uint16_t key = (data->three_dy < 0) ? INPUT_KEY_F15 : INPUT_KEY_F16;
+                uint16_t key = (data->three_dy < 0) ? INPUT_BTN_5 : INPUT_BTN_6;
                 input_report_key(dev, key, true, true, K_FOREVER);
                 input_report_key(dev, key, false, true, K_FOREVER);
                 data->three_swipe_sent = true;
@@ -864,10 +864,10 @@ static void iqs9151_work_cb(struct k_work *work) {
     }
 
     if (pinch_started) {
-        input_report_key(dev, INPUT_KEY_F17, true, true, K_FOREVER);
+        input_report_key(dev, INPUT_BTN_7, true, true, K_FOREVER);
     }
     if (pinch_ended) {
-        input_report_key(dev, INPUT_KEY_F17, false, true, K_FOREVER);
+        input_report_key(dev, INPUT_BTN_7, false, true, K_FOREVER);
     }
 
     if (!three_consumed && (single != 0U || two != 0U)) {
