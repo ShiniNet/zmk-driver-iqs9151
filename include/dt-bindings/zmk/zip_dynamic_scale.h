@@ -1,0 +1,5 @@
+#pragma once
+
+#define ZIP_DYNAMIC_SCALE_INC 1
+#define ZIP_DYNAMIC_SCALE_DEC 2
+#define ZIP_DYNAMIC_SCALE_RESET 3
