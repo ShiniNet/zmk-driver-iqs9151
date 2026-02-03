@@ -14,3 +14,7 @@ properties:
   codes:
     type: array
     required: true
+  scale-group:
+    type: int
+    default: 0
+    description: "Dynamic scale group index (0: XY, 1: Scroll)"

@@ -11,15 +11,38 @@ static int behavior_zip_dynamic_scale_binding_pressed(struct zmk_behavior_bindin
     ARG_UNUSED(event);
     int ret = 0;
 
-    switch (binding->param1) {
-    case ZIP_DYNAMIC_SCALE_INC:
-        ret = zmk_zip_dynamic_scaler_step(1);
+    uint8_t group = (uint8_t)binding->param1;
+
+    switch (binding->param2) {
+    case ZDS_INC:
+        if (group == ZDS_ALL) {
+            ret = zmk_zip_dynamic_scaler_step(ZDS_XY, 1);
+            if (ret >= 0) {
+                ret = zmk_zip_dynamic_scaler_step(ZDS_SC, 1);
+            }
+        } else {
+            ret = zmk_zip_dynamic_scaler_step(group, 1);
+        }
         break;
-    case ZIP_DYNAMIC_SCALE_DEC:
-        ret = zmk_zip_dynamic_scaler_step(-1);
+    case ZDS_DEC:
+        if (group == ZDS_ALL) {
+            ret = zmk_zip_dynamic_scaler_step(ZDS_XY, -1);
+            if (ret >= 0) {
+                ret = zmk_zip_dynamic_scaler_step(ZDS_SC, -1);
+            }
+        } else {
+            ret = zmk_zip_dynamic_scaler_step(group, -1);
+        }
         break;
-    case ZIP_DYNAMIC_SCALE_RESET:
-        ret = zmk_zip_dynamic_scaler_reset();
+    case ZDS_RST:
+        if (group == ZDS_ALL) {
+            ret = zmk_zip_dynamic_scaler_reset(ZDS_XY);
+            if (ret >= 0) {
+                ret = zmk_zip_dynamic_scaler_reset(ZDS_SC);
+            }
+        } else {
+            ret = zmk_zip_dynamic_scaler_reset(group);
+        }
         break;
     default:
         return -EINVAL;

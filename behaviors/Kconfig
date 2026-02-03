@@ -11,3 +11,10 @@ menuconfig ZMK_BEHAVIOR_ZIP_DYNAMIC_SCALE
     help
       Enable the behavior that adjusts the dynamic scale factor used by
       the dynamic scaler input processor.
+
+menuconfig ZMK_BEHAVIOR_ZIP_DYNAMIC_SCALE_SET
+    bool "Dynamic scale set behavior"
+    default y
+    help
+      Enable the behavior that sets the dynamic scale factor used by
+      the dynamic scaler input processor.

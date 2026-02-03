@@ -1,6 +1,6 @@
-description: Dynamic scale adjust behavior
+description: Dynamic scale set behavior
 
-compatible: "zmk,behavior-zip-dynamic-scale"
+compatible: "zmk,behavior-zip-dynamic-scale-set"
 
 properties:
   display-name:
