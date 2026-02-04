@@ -16,4 +16,175 @@ config INPUT_IQS9151_INIT_PRIORITY
     help
       Define the initialization priority for the IQS9151 driver.
 
+choice INPUT_IQS9151_ROTATE
+    prompt "IQS9151 rotate"
+    default INPUT_IQS9151_ROTATE_0
+    help
+      Rotate the trackpad coordinate system (0/90/180/270).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_ROTATE_0
+    bool "0"
+
+config INPUT_IQS9151_ROTATE_90
+    bool "90"
+
+config INPUT_IQS9151_ROTATE_180
+    bool "180"
+
+config INPUT_IQS9151_ROTATE_270
+    bool "270"
+endchoice
+
+config INPUT_IQS9151_RESOLUTION_X
+    int "IQS9151 X resolution"
+    range 0 65535
+    default 2457
+    help
+      X Resolution (0x11E6).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_RESOLUTION_Y
+    int "IQS9151 Y resolution"
+    range 0 65535
+    default 3072
+    help
+      Y Resolution (0x11E8).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_ATI_TARGETCOUNT
+    int "IQS9151 ATI target count"
+    range 0 1000
+    default 400
+    help
+      Trackpad ATI Target (0x119A).
+      Limited to 0-1000 to avoid unstable behavior.
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_SPEED
+    int "IQS9151 dynamic filter bottom speed"
+    range 0 65535
+    default 20
+    help
+      XY Dynamic Filter Bottom Speed (0x11EA).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_DYNAMIC_FILTER_TOP_SPEED
+    int "IQS9151 dynamic filter top speed"
+    range 0 65535
+    default 511
+    help
+      XY Dynamic Filter Top Speed (0x11EC).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_BETA
+    int "IQS9151 dynamic filter bottom beta"
+    range 0 255
+    default 10
+    help
+      XY Dynamic Filter Bottom Beta (0x11EE).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_PRESSHOLD_TIME_MS
+    int "IQS9151 press/hold time (ms)"
+    range 0 1000
+    default 300
+    help
+      Hold Time in milliseconds (0x1200).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_1F_TAP_ENABLE
+    bool "IQS9151 single-finger tap enable"
+    default y
+    help
+      Single Finger Gesture Enable (0x11F6).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_1F_PRESSHOLD_ENABLE
+    bool "IQS9151 single-finger press/hold enable"
+    default y
+    help
+      Single Finger Gesture Enable (0x11F6).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_CURSOR_INERTIA_ENABLE
+    bool "IQS9151 cursor inertia enable"
+    default y
+    help
+      Enable cursor inertia (driver-side).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_CURSOR_INERTIA_DECAY
+    int "IQS9151 cursor inertia decay"
+    range 0 1000
+    default 970
+    help
+      Cursor inertia decay (driver-side).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_2F_TAP_ENABLE
+    bool "IQS9151 two-finger tap enable"
+    default y
+    help
+      Two Finger Gesture Enable (0x11F8).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_2F_PRESSHOLD_ENABLE
+    bool "IQS9151 two-finger press/hold enable"
+    default y
+    help
+      Two Finger Gesture Enable (0x11F8).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_SCROLL_Y_ENABLE
+    bool "IQS9151 vertical scroll enable"
+    default y
+    help
+      Two Finger Gesture Enable (0x11F8).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_SCROLL_X_ENABLE
+    bool "IQS9151 horizontal scroll enable"
+    default y
+    help
+      Two Finger Gesture Enable (0x11F8).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_SCROLL_INERTIA_ENABLE
+    bool "IQS9151 scroll inertia enable"
+    default y
+    help
+      Enable scroll inertia (driver-side).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_SCROLL_INERTIA_DECAY
+    int "IQS9151 scroll inertia decay"
+    range 0 1000
+    default 985
+    help
+      Scroll inertia decay (driver-side).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_2F_PINCH_ENABLE
+    bool "IQS9151 two-finger pinch enable"
+    default y
+    help
+      Two Finger Gesture Enable (0x11F8).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_3F_TAP_ENABLE
+    bool "IQS9151 three-finger tap enable"
+    default y
+    help
+      Three-finger tap (driver-side).
+      Currently not applied by the driver.
+
+config INPUT_IQS9151_3F_SWIPE_THRESHOLD
+    int "IQS9151 three-finger swipe threshold"
+    range 0 1000
+    default 300
+    help
+      Three-finger swipe threshold (driver-side).
+      Currently not applied by the driver.
+
 endif

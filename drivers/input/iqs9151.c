@@ -34,7 +34,7 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 
 #define SCROLL_INERTIA_INTERVAL_MS 10
 #define SCROLL_INERTIA_MAX_DURATION_MS 3000
-#define SCROLL_INERTIA_DECAY_NUM 985
+#define SCROLL_INERTIA_DECAY_NUM CONFIG_INPUT_IQS9151_SCROLL_INERTIA_DECAY
 #define SCROLL_INERTIA_DECAY_DEN 1000
 #define SCROLL_INERTIA_START_THRESHOLD 1
 #define SCROLL_INERTIA_MIN_VELOCITY 1
@@ -42,7 +42,7 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 
 #define CURSOR_INERTIA_INTERVAL_MS 10
 #define CURSOR_INERTIA_MAX_DURATION_MS 3000
-#define CURSOR_INERTIA_DECAY_NUM 970
+#define CURSOR_INERTIA_DECAY_NUM CONFIG_INPUT_IQS9151_CURSOR_INERTIA_DECAY
 #define CURSOR_INERTIA_DECAY_DEN 1000
 #define CURSOR_INERTIA_START_THRESHOLD 2
 #define CURSOR_INERTIA_MIN_VELOCITY 2
@@ -53,7 +53,6 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 #define THREE_FINGER_TAP_GUARD_FRAMES 5
 #define THREE_FINGER_HOLD_TIME_MS 300
 #define THREE_FINGER_HOLD_MOVE 30
-#define THREE_FINGER_SWIPE_DIST 300
 
 struct iqs9151_config {
     struct i2c_dt_spec i2c;
@@ -410,6 +409,38 @@ static int iqs9151_i2c_read(const struct iqs9151_config *cfg, uint16_t reg, uint
     return i2c_write_read_dt(&cfg->i2c, addr_buf, sizeof(addr_buf), buf, len);
 }
 
+static int iqs9151_write_u16(const struct iqs9151_config *cfg, uint16_t reg, uint16_t value) {
+    uint8_t buf[2];
+
+    sys_put_le16(value, buf);
+    return iqs9151_i2c_write(cfg, reg, buf, sizeof(buf));
+}
+
+static int iqs9151_read_u16(const struct iqs9151_config *cfg, uint16_t reg, uint16_t *value) {
+    uint8_t buf[2];
+    int ret = iqs9151_i2c_read(cfg, reg, buf, sizeof(buf));
+
+    if (ret != 0) {
+        return ret;
+    }
+
+    *value = sys_get_le16(buf);
+    return 0;
+}
+
+static int iqs9151_update_bits_u16(const struct iqs9151_config *cfg, uint16_t reg,
+                                   uint16_t mask, uint16_t value) {
+    uint16_t current;
+    int ret = iqs9151_read_u16(cfg, reg, &current);
+
+    if (ret != 0) {
+        return ret;
+    }
+
+    current = (uint16_t)((current & ~mask) | (value & mask));
+    return iqs9151_write_u16(cfg, reg, current);
+}
+
 static void iqs9151_wait_for_ready(const struct device *dev, uint16_t timeout_ms) {
     const struct iqs9151_config *cfg = dev->config;
     uint16_t elapsed = 0;
@@ -443,7 +474,7 @@ static int iqs9151_write_chunks(const struct device *dev, const struct iqs9151_c
     return 0;
 }
 
-static int checkProductNumber(const struct device *dev) {
+static int iqs9151_check_product_number(const struct device *dev) {
     const struct iqs9151_config *cfg = dev->config;
     uint8_t product[2];
     int ret;
@@ -603,13 +634,13 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         }
 
         if (!data->three_swipe_sent && !data->three_hold_sent) {
-            if (iqs9151_abs32(data->three_dx) >= THREE_FINGER_SWIPE_DIST &&
+            if (iqs9151_abs32(data->three_dx) >= CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD &&
                 iqs9151_abs32(data->three_dx) >= iqs9151_abs32(data->three_dy)) {
                 uint16_t key = (data->three_dx < 0) ? INPUT_BTN_3 : INPUT_BTN_4;
                 input_report_key(dev, key, true, true, K_FOREVER);
                 input_report_key(dev, key, false, true, K_FOREVER);
                 data->three_swipe_sent = true;
-            } else if (iqs9151_abs32(data->three_dy) >= THREE_FINGER_SWIPE_DIST &&
+            } else if (iqs9151_abs32(data->three_dy) >= CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD &&
                        iqs9151_abs32(data->three_dy) > iqs9151_abs32(data->three_dx)) {
                 uint16_t key = (data->three_dy < 0) ? INPUT_BTN_5 : INPUT_BTN_6;
                 input_report_key(dev, key, true, true, K_FOREVER);
@@ -633,7 +664,8 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         return true;
     }
 
-    if (!data->three_hold_sent && !data->three_swipe_sent) {
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_3F_TAP_ENABLE) &&
+        !data->three_hold_sent && !data->three_swipe_sent) {
         const int64_t elapsed = k_uptime_get() - data->three_down_ms;
         if (elapsed <= THREE_FINGER_TAP_TIME_MS &&
             iqs9151_abs32(data->three_dx) <= THREE_FINGER_TAP_MOVE &&
@@ -979,17 +1011,21 @@ static void iqs9151_work_cb(struct k_work *work) {
     const bool cursor_released =
         (prev_frame.finger_count == 1U) && (frame.finger_count == 0U);
     if (cursor_released && !prev_press_hold && !cursor_guard_active) {
-        iqs9151_inertia_start(&data->inertia_cursor, &data->inertia_cursor_work,
-                              &iqs9151_cursor_params,
-                              data->cursor_ema_x_fp, data->cursor_ema_y_fp);
+        if (IS_ENABLED(CONFIG_INPUT_IQS9151_CURSOR_INERTIA_ENABLE)) {
+            iqs9151_inertia_start(&data->inertia_cursor, &data->inertia_cursor_work,
+                                  &iqs9151_cursor_params,
+                                  data->cursor_ema_x_fp, data->cursor_ema_y_fp);
+        }
         iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
     }
 
     // Inertial Scrolling
     if (scroll_ended) {
-        iqs9151_inertia_start(&data->inertia_scroll, &data->inertia_scroll_work,
-                              &iqs9151_scroll_params,
-                              data->scroll_ema_x_fp, data->scroll_ema_y_fp);
+        if (IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_INERTIA_ENABLE)) {
+            iqs9151_inertia_start(&data->inertia_scroll, &data->inertia_scroll_work,
+                                  &iqs9151_scroll_params,
+                                  data->scroll_ema_x_fp, data->scroll_ema_y_fp);
+        }
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
     }
     if (pinch_now) {
@@ -1005,7 +1041,7 @@ static void iqs9151_gpio_cb(const struct device *port, struct gpio_callback *cb,
     k_work_submit(&data->work);
 }
 
-static int set_interrupt(const struct device *dev, const bool en) {
+static int iqs9151_set_interrupt(const struct device *dev, const bool en) {
     const struct iqs9151_config *config = dev->config;
     int ret = gpio_pin_interrupt_configure_dt( &config->irq_gpio, en ? GPIO_INT_EDGE_TO_ACTIVE : GPIO_INT_DISABLE);
     if (ret < 0) {
@@ -1073,7 +1109,7 @@ static int iqs9151_ack_reset(const struct device *dev) {
     return ret;
 }
 
-static int iqs9151_setEventMode(const struct device *dev) {
+static int iqs9151_set_event_mode(const struct device *dev) {
     const struct iqs9151_config *cfg = dev->config;
     uint8_t config_settings[2];
 
@@ -1160,6 +1196,130 @@ static int iqs9151_configure(const struct device *dev) {
     return ret;
 }
 
+static int iqs9151_apply_kconfig_overrides(const struct device *dev) {
+    const struct iqs9151_config *cfg = dev->config;
+    uint16_t rotate_bits = 0U;
+    uint16_t single_bits = 0U;
+    uint16_t two_bits = 0U;
+    int ret;
+
+    /* 90/270 are counterclockwise. */
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_ROTATE_90)) {
+        rotate_bits = IQS9151_TRACKPAD_SETTING_SWITCH_XY |
+                      IQS9151_TRACKPAD_SETTING_FLIP_Y;
+    } else if (IS_ENABLED(CONFIG_INPUT_IQS9151_ROTATE_180)) {
+        rotate_bits = IQS9151_TRACKPAD_SETTING_FLIP_X |
+                      IQS9151_TRACKPAD_SETTING_FLIP_Y;
+    } else if (IS_ENABLED(CONFIG_INPUT_IQS9151_ROTATE_270)) {
+        rotate_bits = IQS9151_TRACKPAD_SETTING_SWITCH_XY |
+                      IQS9151_TRACKPAD_SETTING_FLIP_X;
+    }
+
+    ret = iqs9151_update_bits_u16(cfg, IQS9151_ADDR_TRACKPAD_SETTINGS,
+                                  IQS9151_TRACKPAD_SETTING_FLIP_X |
+                                      IQS9151_TRACKPAD_SETTING_FLIP_Y |
+                                      IQS9151_TRACKPAD_SETTING_SWITCH_XY,
+                                  rotate_bits);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply rotate settings (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_write_u16(cfg, IQS9151_ADDR_X_RESOLUTION,
+                            (uint16_t)CONFIG_INPUT_IQS9151_RESOLUTION_X);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply X resolution (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_write_u16(cfg, IQS9151_ADDR_Y_RESOLUTION,
+                            (uint16_t)CONFIG_INPUT_IQS9151_RESOLUTION_Y);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply Y resolution (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_write_u16(cfg, IQS9151_ADDR_TRACKPAD_ATI_TARGET,
+                            (uint16_t)CONFIG_INPUT_IQS9151_ATI_TARGETCOUNT);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply ATI target (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_write_u16(cfg, IQS9151_ADDR_XY_DYNAMIC_FILTER_BOTTOM_SPEED,
+                            (uint16_t)CONFIG_INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_SPEED);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply dynamic filter bottom speed (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_write_u16(cfg, IQS9151_ADDR_XY_DYNAMIC_FILTER_TOP_SPEED,
+                            (uint16_t)CONFIG_INPUT_IQS9151_DYNAMIC_FILTER_TOP_SPEED);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply dynamic filter top speed (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_i2c_write(
+        cfg, IQS9151_ADDR_XY_DYNAMIC_FILTER_BOTTOM_BETA,
+        (const uint8_t[]){(uint8_t)CONFIG_INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_BETA}, 1);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply dynamic filter bottom beta (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_write_u16(cfg, IQS9151_ADDR_HOLD_TIME,
+                            (uint16_t)CONFIG_INPUT_IQS9151_PRESSHOLD_TIME_MS);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply hold time (%d)", ret);
+        return ret;
+    }
+
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_1F_TAP_ENABLE)) {
+        single_bits |= IQS9151_SFG_SINGLE_TAP;
+    }
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE)) {
+        single_bits |= IQS9151_SFG_PRESS_HOLD;
+    }
+
+    ret = iqs9151_update_bits_u16(cfg, IQS9151_ADDR_GESTURE_ENABLE,
+                                  IQS9151_SFG_SINGLE_TAP | IQS9151_SFG_PRESS_HOLD,
+                                  single_bits);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply 1F gesture enables (%d)", ret);
+        return ret;
+    }
+
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_2F_TAP_ENABLE)) {
+        two_bits |= IQS9151_TFG_TWO_TAP;
+    }
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE)) {
+        two_bits |= IQS9151_TFG_TWO_PRESS_HOLD;
+    }
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PINCH_ENABLE)) {
+        two_bits |= IQS9151_TFG_ZOOM_IN | IQS9151_TFG_ZOOM_OUT;
+    }
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE)) {
+        two_bits |= IQS9151_TFG_VSCROLL;
+    }
+    if (IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE)) {
+        two_bits |= IQS9151_TFG_HSCROLL;
+    }
+
+    ret = iqs9151_update_bits_u16(
+        cfg, IQS9151_ADDR_TWO_FINGER_GESTURE_ENABLE,
+        IQS9151_TFG_TWO_TAP | IQS9151_TFG_TWO_PRESS_HOLD |
+            IQS9151_TFG_ZOOM_IN | IQS9151_TFG_ZOOM_OUT |
+            IQS9151_TFG_VSCROLL | IQS9151_TFG_HSCROLL,
+        two_bits);
+    if (ret != 0) {
+        LOG_ERR("Failed to apply 2F gesture enables (%d)", ret);
+        return ret;
+    }
+
+    return 0;
+}
+
 static int iqs9151_init(const struct device *dev) {
     const struct iqs9151_config *cfg = dev->config;
     struct iqs9151_data *data = dev->data;
@@ -1210,7 +1370,7 @@ static int iqs9151_init(const struct device *dev) {
     // iqs9151_wait_for_ready(dev, 1000);
 
     // Check Product Number
-    ret = checkProductNumber(dev);
+    ret = iqs9151_check_product_number(dev);
     if (ret != 0) {
         return ret;
     }
@@ -1234,6 +1394,15 @@ static int iqs9151_init(const struct device *dev) {
         return ret;
     }
     LOG_DBG("Setup Initial Config complete");
+
+    iqs9151_wait_for_ready(dev, 100);
+
+    ret = iqs9151_apply_kconfig_overrides(dev);
+    if (ret != 0) {
+        LOG_ERR("Kconfig override apply failed: %d", ret);
+        return ret;
+    }
+    LOG_DBG("Kconfig overrides applied");
 
     iqs9151_wait_for_ready(dev, 100);
 
@@ -1274,7 +1443,7 @@ static int iqs9151_init(const struct device *dev) {
     iqs9151_wait_for_ready(dev, 100);
 
     // Set Event Mode
-    ret = iqs9151_setEventMode(dev);
+    ret = iqs9151_set_event_mode(dev);
     if (ret) {
         LOG_ERR("Set Event Mode failed (%d)", ret);
         return ret;
@@ -1282,7 +1451,7 @@ static int iqs9151_init(const struct device *dev) {
     LOG_DBG("Set Event Mode complete complete");
 
     // start IRQ
-    set_interrupt(dev, true);
+    iqs9151_set_interrupt(dev, true);
     LOG_DBG("Initialization complete");
     return 0;
 }
