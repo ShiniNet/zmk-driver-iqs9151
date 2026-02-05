@@ -1,8 +1,12 @@
 ﻿# zmk-driver-iqs9151
 
-私が自作したIQS9151トラックパッドモジュールをZMKで使用するためのドライバです。  
+私が自作したIQS9151トラックパッドモジュールをZMKで使用するための専用ドライバです。  
 トラックパッドによるカーソル移動/タップ/スクロール/ピンチインアウトや複数指ジェスチャなどの操作を扱えるようになります。  
-トラックパッドモジュールは[Booth（Soon）](https://shininet.booth.pm/)より入手可能です。
+また、ZMKからトラックパッドの動作設定を行いやすくする為の拡張機能がいくつか追加されます。
+
+トラックパッドモジュールは[Booth（準備中）](https://shininet.booth.pm/)より入手可能です。  
+
+<img width="600"  alt="image" src="https://github.com/user-attachments/assets/76c1e221-bab2-4d7d-9250-408a9b767e39" />
 
 ## ドライバの特徴
 
@@ -65,7 +69,7 @@ CONFIG_INPUT_IQS9151=y
         compatible = "azoteq,iqs9151";
         reg = <0x56>;
         status = "okay";
-        irq-gpios = <&gpio1 11 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+        irq-gpios = <&gpio1 11 (GPIO_ACTIVE_LOW)>;
     };
 };
 
@@ -81,12 +85,16 @@ CONFIG_INPUT_IQS9151=y
 
 ### 4. 物理配線
 
-- `SDA` -> MCUのI2C SDA
-- `SCL` -> MCUのI2C SCL
-- `IRQ` -> DTSの`irq-gpios`で指定したGPIO入力
+- `SDA` -> MCUのI2C SDA（Xiao BLEの場合D4）
+- `SCL` -> MCUのI2C SCL（Xiao BLEの場合D5）
+- `DR` -> DTSの`irq-gpios`で指定したGPIO入力（今回の例ではGPIO1.11=D6）
 - `RST` -> MCUのRESETピン（省略可能）
 - `3.3V` -> 3.3V電源
 - `GND` -> GND
+
+※SDA/SCL/DRのプルアップ抵抗はトラックパッド側に4.7KΩ実装済みなので不要。  
+
+<img width="447" height="202" alt="image" src="https://github.com/user-attachments/assets/e2b8f28e-d779-4635-be67-05a65c6e2911" />
 
 ### 5. 動作確認（デフォルト機能）
 
@@ -103,7 +111,7 @@ CONFIG_INPUT_IQS9151=y
 - キー入力によってトラックパッドのカーソル(スクロール)速度を動的に変更する
 - スプリットキーボード構成への組み込み。ダブルトラックパッド化
 
-実装例は `Lalapadv2` 関連リポジトリを参照してください。
+実装例は `Lalapadv2` 関連リポジトリを参照してください。(準備中)
 
 
 ## 対応環境
@@ -111,11 +119,11 @@ CONFIG_INPUT_IQS9151=y
 - ZMK Firmware `v0.3.0` 以上
 - 確認済みMCU/ボード: `Seeed XIAO BLE` / `Seeed XIAO BLE Plus`
 - 他のnRF52840系ボードでも動作する可能性はありますが、未検証です（利用は自己責任）。
-- 最低でも `SDA/SCL/IRQ` 用GPIO + `3.3V/GND` が利用可能であること。
+- 最低でも `SDA/SCL/DR` 用GPIO + `3.3V/GND` が利用可能であること。
 
 ## 注意事項
 
-- `TPS65` など同社の汎用トラックパッドでは動作しません。
+- `TPS65` など同社の汎用トラックパッド等では動作しません。
 
 
 ## 免責事項・その他
