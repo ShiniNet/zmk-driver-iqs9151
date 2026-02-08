@@ -865,7 +865,12 @@ static void iqs9151_work_cb(struct k_work *work) {
         (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED) != 0U;
 
     if (frame.info_flags & IQS9151_INFO_SHOW_RESET) {
-        /* TODO: handle reset indication if needed */
+        uint16_t gesture_enable = 0U;
+        uint16_t two_finger_enable = 0U;
+        (void)iqs9151_read_u16(cfg, IQS9151_ADDR_GESTURE_ENABLE, &gesture_enable);
+        (void)iqs9151_read_u16(cfg, IQS9151_ADDR_TWO_FINGER_GESTURE_ENABLE, &two_finger_enable);
+        LOG_WRN("SHOW_RESET detected: info=0x%04x gesture_en=0x%04x two_finger_en=0x%04x",
+                frame.info_flags, gesture_enable, two_finger_enable);
         return;
     }
 
@@ -891,6 +896,8 @@ static void iqs9151_work_cb(struct k_work *work) {
     uint16_t two = frame.two_finger_gestures;
     const bool tap_guard = data->three_guard_frames > 0U;
     if (tap_guard) {
+        LOG_DBG("tap_guard active: frames=%u single=0x%04x two=0x%04x",
+                data->three_guard_frames, single, two);
         single &= (uint16_t)~BIT(0);
         two &= (uint16_t)~BIT(0);
     }
@@ -975,6 +982,9 @@ static void iqs9151_work_cb(struct k_work *work) {
             frame.rel_x, frame.rel_y, frame.gesture_x, frame.gesture_y, frame.info_flags,
             frame.trackpad_flags,frame.single_gestures,frame.two_finger_gestures,
             frame.finger_count, frame.finger1_x, frame.finger1_y);
+    LOG_DBG("guard_frames: three=%u cursor=%u hold_button=0x%04x pinch_active=%d",
+            data->three_guard_frames, data->cursor_guard_frames, data->hold_button,
+            data->pinch_active);
     
     if (data->three_guard_frames > 0U) {
         data->three_guard_frames--;
@@ -1091,6 +1101,7 @@ static int iqs9151_ack_reset(const struct device *dev) {
 
     ret = iqs9151_i2c_read(cfg, IQS9151_ADDR_SYSTEM_CONTROL, ctrl, sizeof(ctrl));
     if (ret != 0) {
+        LOG_ERR("Read SYSTEM CONTROL(ACK_RESET) failed (%d)", ret);
         return ret;
     }
 
@@ -1102,10 +1113,67 @@ static int iqs9151_ack_reset(const struct device *dev) {
 
     ret = iqs9151_i2c_write(cfg, IQS9151_ADDR_SYSTEM_CONTROL, ctrl, sizeof(ctrl));
     if (ret != 0) {
+        LOG_ERR("Wrte SYSTEM CONTROL(ACK_RESET) failed (%d)", ret);
         return ret;
     }
 
     k_msleep(IQS9151_RSTD_DELAY_MS);
+    return ret;
+}
+
+static int iqs9151_wait_for_show_reset(const struct device *dev, uint16_t timeout_ms) {
+    const struct iqs9151_config *cfg = dev->config;
+    int64_t start_ms = k_uptime_get();
+
+    while ((k_uptime_get() - start_ms) < timeout_ms) {
+        uint8_t info[2];
+        int ret;
+
+        iqs9151_wait_for_ready(dev, 100);
+        ret = iqs9151_i2c_read(cfg, IQS9151_ADDR_INFO_FLAGS, info, sizeof(info));
+        if (ret != 0) {
+            return ret;
+        }
+
+        if ((sys_get_le16(info) & IQS9151_INFO_SHOW_RESET) != 0U) {
+            return 0;
+        }
+
+        k_sleep(K_MSEC(IQS9151_ATI_POLL_INTERVAL_MS));
+    }
+
+    LOG_ERR("Show Reset timeout after %dms", timeout_ms);
+    return -EIO;
+}
+
+static int iqs9151_sw_reset(const struct device *dev) {
+    const struct iqs9151_config *cfg = dev->config;
+    uint8_t ctrl[2];
+    int ret;
+
+    ret = iqs9151_i2c_read(cfg, IQS9151_ADDR_SYSTEM_CONTROL, ctrl, sizeof(ctrl));
+    if (ret != 0) {
+        LOG_ERR("Read SYSTEM CONTROL(SW_RESET) failed (%d)", ret);
+        return ret;
+    }
+
+    uint16_t config = sys_get_le16(ctrl);
+    config |= IQS9151_SYS_CTRL_SW_RESET;
+    sys_put_le16(config, ctrl);
+
+    iqs9151_wait_for_ready(dev, 500);
+
+    ret = iqs9151_i2c_write(cfg, IQS9151_ADDR_SYSTEM_CONTROL, ctrl, sizeof(ctrl));
+    if (ret != 0) {
+        LOG_ERR("Wrte SYSTEM CONTROL(SW_RESET) failed (%d)", ret);
+        return ret;
+    }
+
+    ret = iqs9151_wait_for_show_reset(dev, 3000);
+    if (ret != 0) {
+        return ret;
+    }
+
     return ret;
 }
 
@@ -1125,30 +1193,6 @@ static int iqs9151_set_event_mode(const struct device *dev) {
     iqs9151_wait_for_ready(dev, 500);
 
     return iqs9151_i2c_write(cfg, IQS9151_ADDR_CONFIG_SETTINGS, config_settings, sizeof(config_settings));
-}
-
-static int iqs9151_hw_reset(const struct device *dev) {
-    const struct iqs9151_config *cfg = dev->config;
-
-    if (!cfg->reset_gpio.port) {
-        return -ENODEV;
-    }
-
-    int ret = gpio_pin_set_dt(&cfg->reset_gpio, 1); // reset_gpio=ACTIVE_LOW
-    if (ret) {
-        return ret;
-    }
-
-    k_busy_wait(IQS9151_RESET_PULSE_US);
-
-    ret = gpio_pin_set_dt(&cfg->reset_gpio, 0);
-    if (ret) {
-        return ret;
-    }
-
-    k_msleep(IQS9151_RSTD_DELAY_MS);
-
-    return 0;
 }
 
 static int iqs9151_configure(const struct device *dev) {
@@ -1359,21 +1403,21 @@ static int iqs9151_init(const struct device *dev) {
         return ret;
     }
 
-    // // HW_RESET
-    // ret = iqs9151_hw_reset(dev);
-    // if (ret != 0) {
-    //     LOG_ERR("HW Reset failed (%d)", ret);
-    //     return ret;
-    // }
-    // LOG_DBG("Hardware RESET complete");
-
-    // iqs9151_wait_for_ready(dev, 1000);
-
     // Check Product Number
     ret = iqs9151_check_product_number(dev);
     if (ret != 0) {
         return ret;
     }
+
+    iqs9151_wait_for_ready(dev, 500);
+
+    // SW Reset (Show Reset wait + ACK)
+    ret = iqs9151_sw_reset(dev);
+    if (ret) {
+        LOG_ERR("SW Reset failed (%d)", ret);
+        return ret;
+    }
+    LOG_DBG("SW Reset complete");
 
     iqs9151_wait_for_ready(dev, 500);
 
