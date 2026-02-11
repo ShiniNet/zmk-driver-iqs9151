@@ -107,7 +107,7 @@
 #define LP2_MODE_SAMPLING_PERIOD_1               0x00
 #define STATIONARY_TOUCH_TIMEOUT_0               0x0A
 #define STATIONARY_TOUCH_TIMEOUT_1               0x00
-#define IDLE_TOUCH_MODE_TIMEOUT_0                0x3C
+#define IDLE_TOUCH_MODE_TIMEOUT_0                0x0A // 0x3C
 #define IDLE_TOUCH_MODE_TIMEOUT_1                0x00
 #define IDLE_MODE_TIMEOUT_0                      0x05
 #define IDLE_MODE_TIMEOUT_1                      0x00
