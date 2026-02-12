@@ -10,8 +10,3 @@ properties:
     type: phandle-array
     required: true
     description: Interrupt GPIO for IQS9151 driver.
-
-  reset-gpios:
-    type: phandle-array
-    required: true
-    description: Reset pin

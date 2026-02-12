@@ -25,7 +25,6 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 
 #define IQS9151_I2C_CHUNK_SIZE 30
 #define IQS9151_RSTD_DELAY_MS 100
-#define IQS9151_RESET_PULSE_US 200
 #define IQS9151_ATI_TIMEOUT_MS 1000
 #define IQS9151_ATI_POLL_INTERVAL_MS 10
 #define INERTIA_FP_SHIFT 8
@@ -57,7 +56,6 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 struct iqs9151_config {
     struct i2c_dt_spec i2c;
     struct gpio_dt_spec irq_gpio;
-    struct gpio_dt_spec reset_gpio;
 };
 struct iqs9151_frame {
     int16_t rel_x;
@@ -1390,19 +1388,6 @@ static int iqs9151_init(const struct device *dev) {
         return ret;
     }
 
-    if (!cfg->reset_gpio.port) {
-        LOG_ERR("Reset GPIO not defined");
-        return -ENODEV;
-    }
-    if (!device_is_ready(cfg->reset_gpio.port)) {
-        LOG_ERR("Reset GPIO not ready");
-        return -ENODEV;
-    }
-    ret = gpio_pin_configure_dt(&cfg->reset_gpio, GPIO_OUTPUT_ACTIVE);
-    if (ret) {
-        return ret;
-    }
-
     // Check Product Number
     ret = iqs9151_check_product_number(dev);
     if (ret != 0) {
@@ -1504,7 +1489,6 @@ static int iqs9151_init(const struct device *dev) {
     static const struct iqs9151_config iqs9151_config_##inst = {    \
         .i2c = I2C_DT_SPEC_INST_GET(inst),                                      \
         .irq_gpio = GPIO_DT_SPEC_INST_GET(inst, irq_gpios),                     \
-        .reset_gpio = GPIO_DT_SPEC_INST_GET_OR(inst, reset_gpios, {0}),         \
   };                                                                          \
   static struct iqs9151_data iqs9151_data_##inst;                 \
   DEVICE_DT_INST_DEFINE(inst, iqs9151_init, NULL,                       \
