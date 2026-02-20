@@ -634,7 +634,7 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         if (!data->three_swipe_sent && !data->three_hold_sent) {
             if (iqs9151_abs32(data->three_dx) >= CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD &&
                 iqs9151_abs32(data->three_dx) >= iqs9151_abs32(data->three_dy)) {
-                uint16_t key = (data->three_dx < 0) ? INPUT_BTN_3 : INPUT_BTN_4;
+                uint16_t key = (data->three_dx < 0) ? INPUT_BTN_4 : INPUT_BTN_3;
                 input_report_key(dev, key, true, true, K_FOREVER);
                 input_report_key(dev, key, false, true, K_FOREVER);
                 data->three_swipe_sent = true;
