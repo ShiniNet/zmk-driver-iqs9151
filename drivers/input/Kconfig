@@ -91,28 +91,25 @@ config INPUT_IQS9151_PRESSHOLD_TIME_MS
     default 300
     help
       Hold Time in milliseconds (0x1200).
-      Currently not applied by the driver.
+      Used by driver-side 1F/2F press-hold detection.
 
 config INPUT_IQS9151_1F_TAP_ENABLE
     bool "IQS9151 single-finger tap enable"
     default y
     help
-      Single Finger Gesture Enable (0x11F6).
-      Currently not applied by the driver.
+      Enable single-finger tap detection in the driver.
 
 config INPUT_IQS9151_1F_PRESSHOLD_ENABLE
     bool "IQS9151 single-finger press/hold enable"
     default y
     help
-      Single Finger Gesture Enable (0x11F6).
-      Currently not applied by the driver.
+      Enable single-finger press/hold detection in the driver.
 
 config INPUT_IQS9151_CURSOR_INERTIA_ENABLE
     bool "IQS9151 cursor inertia enable"
     default y
     help
       Enable cursor inertia (driver-side).
-      Currently not applied by the driver.
 
 config INPUT_IQS9151_CURSOR_INERTIA_DECAY
     int "IQS9151 cursor inertia decay"
@@ -120,42 +117,36 @@ config INPUT_IQS9151_CURSOR_INERTIA_DECAY
     default 970
     help
       Cursor inertia decay (driver-side).
-      Currently not applied by the driver.
 
 config INPUT_IQS9151_2F_TAP_ENABLE
     bool "IQS9151 two-finger tap enable"
     default y
     help
-      Two Finger Gesture Enable (0x11F8).
-      Currently not applied by the driver.
+      Enable two-finger tap detection in the driver.
 
 config INPUT_IQS9151_2F_PRESSHOLD_ENABLE
     bool "IQS9151 two-finger press/hold enable"
     default y
     help
-      Two Finger Gesture Enable (0x11F8).
-      Currently not applied by the driver.
+      Enable two-finger press/hold detection in the driver.
 
 config INPUT_IQS9151_SCROLL_Y_ENABLE
     bool "IQS9151 vertical scroll enable"
     default y
     help
-      Two Finger Gesture Enable (0x11F8).
-      Currently not applied by the driver.
+      Enable driver-side vertical two-finger scroll.
 
 config INPUT_IQS9151_SCROLL_X_ENABLE
     bool "IQS9151 horizontal scroll enable"
     default y
     help
-      Two Finger Gesture Enable (0x11F8).
-      Currently not applied by the driver.
+      Enable driver-side horizontal two-finger scroll.
 
 config INPUT_IQS9151_SCROLL_INERTIA_ENABLE
     bool "IQS9151 scroll inertia enable"
     default y
     help
       Enable scroll inertia (driver-side).
-      Currently not applied by the driver.
 
 config INPUT_IQS9151_SCROLL_INERTIA_DECAY
     int "IQS9151 scroll inertia decay"
@@ -163,21 +154,18 @@ config INPUT_IQS9151_SCROLL_INERTIA_DECAY
     default 985
     help
       Scroll inertia decay (driver-side).
-      Currently not applied by the driver.
 
 config INPUT_IQS9151_2F_PINCH_ENABLE
     bool "IQS9151 two-finger pinch enable"
     default y
     help
-      Two Finger Gesture Enable (0x11F8).
-      Currently not applied by the driver.
+      Enable driver-side two-finger pinch detection.
 
 config INPUT_IQS9151_3F_TAP_ENABLE
     bool "IQS9151 three-finger tap enable"
     default y
     help
-      Three-finger tap (driver-side).
-      Currently not applied by the driver.
+      Enable three-finger tap (driver-side).
 
 config INPUT_IQS9151_3F_SWIPE_THRESHOLD
     int "IQS9151 three-finger swipe threshold"
@@ -185,6 +173,5 @@ config INPUT_IQS9151_3F_SWIPE_THRESHOLD
     default 300
     help
       Three-finger swipe threshold (driver-side).
-      Currently not applied by the driver.
 
 endif

@@ -21,6 +21,8 @@
 #define IQS9151_ADDR_FINGER_DATA               0x1024
 #define IQS9151_ADDR_FINGER1_X                 0x1024
 #define IQS9151_ADDR_FINGER1_Y                 0x1026
+#define IQS9151_ADDR_FINGER2_X                 0x102C
+#define IQS9151_ADDR_FINGER2_Y                 0x102E
 #define IQS9151_ADDR_TOUCH_STATUS              0x105C
 
 #define IQS9151_COORD_BLOCK_START              IQS9151_ADDR_RELATIVE_X
@@ -63,6 +65,7 @@
 #define IQS9151_TP_MOVEMENT_DETECTED           BIT(4)
 #define IQS9151_TP_FINGER_COUNT_MASK           BIT_MASK(4)
 #define IQS9151_TP_FINGER1_CONFIDENCE          BIT(8)
+#define IQS9151_TP_FINGER2_CONFIDENCE          BIT(9)
 
 /* Trackpad Settings bits (IQS9151_ADDR_TRACKPAD_SETTINGS) */
 #define IQS9151_TRACKPAD_SETTING_FLIP_X        BIT(0)
