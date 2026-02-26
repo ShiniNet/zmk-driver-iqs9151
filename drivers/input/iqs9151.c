@@ -1388,6 +1388,8 @@ static int iqs9151_init(const struct device *dev) {
         return ret;
     }
 
+    iqs9151_wait_for_ready(dev, 500);
+    
     // Check Product Number
     ret = iqs9151_check_product_number(dev);
     if (ret != 0) {
