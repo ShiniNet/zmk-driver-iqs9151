@@ -1,6 +1,6 @@
 zephyr_library()
 
-zephyr_library_include_directories(${ZEPHYR_BASE}/../zmk/appapp/include)
+zephyr_library_include_directories(${ZEPHYR_BASE}/../zmk/app/include)
 zephyr_library_include_directories(${CMAKE_CURRENT_LIST_DIR}/../include)
 
 zephyr_library_sources_ifdef(CONFIG_ZMK_INPUT_PROCESSOR_DYNAMIC_SCALER input_processor_dynamic_scaler.c)
