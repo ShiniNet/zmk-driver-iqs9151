@@ -10,6 +10,15 @@ menuconfig INPUT_IQS9151
 
 if INPUT_IQS9151
 
+config INPUT_IQS9151_LOG_LEVEL
+    int "IQS9151 log level"
+    range 0 4
+    default INPUT_LOG_LEVEL
+    help
+      Log level for the IQS9151 driver module.
+      0: none, 1: err, 2: wrn, 3: inf, 4: dbg.
+      Defaults to INPUT_LOG_LEVEL to follow input subsystem policy.
+
 config INPUT_IQS9151_INIT_PRIORITY
     int "IQS9151 init priority"
     default 80

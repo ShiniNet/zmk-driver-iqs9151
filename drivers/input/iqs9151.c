@@ -19,7 +19,7 @@
 #include <stdint.h>
 #include <string.h>
 
-LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
+LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 
 #define DT_DRV_COMPAT azoteq_iqs9151
 
