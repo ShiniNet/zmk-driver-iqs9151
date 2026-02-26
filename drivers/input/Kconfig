@@ -91,7 +91,8 @@ config INPUT_IQS9151_PRESSHOLD_TIME_MS
     default 300
     help
       Hold Time in milliseconds (0x1200).
-      Used by driver-side 1F/2F press-hold detection.
+      Written to the IC hold-time register only.
+      Driver-side hold detection uses fixed values from gesture_spec.
 
 config INPUT_IQS9151_1F_TAP_ENABLE
     bool "IQS9151 single-finger tap enable"

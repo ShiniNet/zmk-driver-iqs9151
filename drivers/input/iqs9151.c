@@ -47,16 +47,14 @@ LOG_MODULE_REGISTER(iqs9151, LOG_LEVEL_DBG /*CONFIG_INPUT_LOG_LEVEL*/);
 #define CURSOR_INERTIA_START_THRESHOLD 2
 #define CURSOR_INERTIA_MIN_VELOCITY 2
 #define CURSOR_EMA_ALPHA 30
-#define CURSOR_GUARD_FRAMES 5
-#define THREE_FINGER_TAP_TIME_MS 150
+#define IQS9151_TAP_MAX_MS 150
+#define IQS9151_HOLD_MIN_MS 200
+#define IQS9151_TAP_REENTRY_WINDOW_MS 30
+#define IQS9151_FINGER_HISTORY_SIZE 5
 #define THREE_FINGER_TAP_MOVE 25
-#define THREE_FINGER_TAP_GUARD_FRAMES 5
-#define THREE_FINGER_HOLD_TIME_MS 300
 #define THREE_FINGER_HOLD_MOVE 30
-#define ONE_FINGER_TAP_TIME_MS 180
 #define ONE_FINGER_TAP_MOVE 25
 #define ONE_FINGER_HOLD_MOVE 30
-#define TWO_FINGER_TAP_TIME_MS 180
 #define TWO_FINGER_TAP_MOVE 30
 #define TWO_FINGER_HOLD_MOVE 40
 #define TWO_FINGER_SCROLL_START_MOVE 20
@@ -86,6 +84,7 @@ enum iqs9151_two_finger_mode {
 struct iqs9151_one_finger_state {
     bool active;
     bool hold_sent;
+    bool tap_candidate;
     int64_t down_ms;
     int32_t dx;
     int32_t dy;
@@ -95,6 +94,7 @@ struct iqs9151_one_finger_state {
 struct iqs9151_two_finger_state {
     bool active;
     bool hold_sent;
+    bool tap_candidate;
     int64_t down_ms;
     int32_t centroid_dx;
     int32_t centroid_dy;
@@ -135,6 +135,12 @@ struct iqs9151_inertia_state {
     int64_t last_ms;
     uint32_t elapsed_ms;
 };
+
+struct iqs9151_finger_history_entry {
+    int64_t ms;
+    uint8_t finger_count;
+};
+
 struct iqs9151_data {
     const struct device *dev;
     struct gpio_callback gpio_cb;
@@ -153,14 +159,16 @@ struct iqs9151_data {
     bool three_active;
     bool three_hold_sent;
     bool three_swipe_sent;
+    bool three_tap_candidate;
     int64_t three_down_ms;
     int32_t three_dx;
     int32_t three_dy;
     uint16_t three_last_x;
     uint16_t three_last_y;
-    uint8_t three_guard_frames;
-    uint8_t cursor_guard_frames;
     uint16_t hold_button;
+    struct iqs9151_finger_history_entry finger_history[IQS9151_FINGER_HISTORY_SIZE];
+    uint8_t finger_history_head;
+    uint8_t finger_history_count;
 };
 
 static const uint8_t iqs9151_alp_compensation[] = {
@@ -646,6 +654,86 @@ static void iqs9151_release_hold(struct iqs9151_data *data, const struct device 
     data->hold_button = 0U;
 }
 
+static void iqs9151_reset_finger_history(struct iqs9151_data *data) {
+    memset(data->finger_history, 0, sizeof(data->finger_history));
+    data->finger_history_head = 0U;
+    data->finger_history_count = 0U;
+}
+
+static void iqs9151_push_finger_history(struct iqs9151_data *data,
+                                        uint8_t finger_count,
+                                        int64_t now_ms) {
+    struct iqs9151_finger_history_entry *entry =
+        &data->finger_history[data->finger_history_head];
+
+    entry->ms = now_ms;
+    entry->finger_count = finger_count;
+
+    data->finger_history_head =
+        (uint8_t)((data->finger_history_head + 1U) % IQS9151_FINGER_HISTORY_SIZE);
+    if (data->finger_history_count < IQS9151_FINGER_HISTORY_SIZE) {
+        data->finger_history_count++;
+    }
+}
+
+static bool iqs9151_has_recent_finger_count(const struct iqs9151_data *data,
+                                            uint8_t finger_count,
+                                            int64_t now_ms,
+                                            int32_t window_ms) {
+    for (uint8_t i = 0U; i < data->finger_history_count; i++) {
+        const uint8_t idx =
+            (uint8_t)((data->finger_history_head + IQS9151_FINGER_HISTORY_SIZE - 1U - i) %
+                      IQS9151_FINGER_HISTORY_SIZE);
+        const struct iqs9151_finger_history_entry *entry = &data->finger_history[idx];
+        const int64_t elapsed_ms = now_ms - entry->ms;
+
+        if (elapsed_ms > window_ms) {
+            break;
+        }
+        if (entry->finger_count == finger_count) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool iqs9151_try_tap_hold_emit(struct iqs9151_data *data,
+                                      const struct device *dev,
+                                      uint16_t button) {
+    if (data->hold_button != 0U) {
+        if (data->hold_button != button) {
+            iqs9151_release_hold(data, dev);
+        }
+        return false;
+    }
+    return true;
+}
+
+static bool iqs9151_emit_click(struct iqs9151_data *data,
+                               const struct device *dev,
+                               uint16_t button) {
+    if (!iqs9151_try_tap_hold_emit(data, dev, button)) {
+        return false;
+    }
+
+    input_report_key(dev, button, true, true, K_FOREVER);
+    input_report_key(dev, button, false, true, K_FOREVER);
+    return true;
+}
+
+static bool iqs9151_emit_hold_press(struct iqs9151_data *data,
+                                    const struct device *dev,
+                                    uint16_t button) {
+    if (!iqs9151_try_tap_hold_emit(data, dev, button)) {
+        return false;
+    }
+
+    input_report_key(dev, button, true, true, K_FOREVER);
+    data->hold_button = button;
+    return true;
+}
+
 static bool iqs9151_get_finger1_xy(const struct iqs9151_frame *frame,
                                    const struct iqs9151_frame *prev_frame,
                                    uint16_t *x, uint16_t *y) {
@@ -693,6 +781,7 @@ static int32_t iqs9151_two_finger_distance(uint16_t x1, uint16_t y1,
 static void iqs9151_one_finger_reset(struct iqs9151_one_finger_state *state) {
     state->active = false;
     state->hold_sent = false;
+    state->tap_candidate = false;
     state->down_ms = 0;
     state->dx = 0;
     state->dy = 0;
@@ -703,6 +792,7 @@ static void iqs9151_one_finger_reset(struct iqs9151_one_finger_state *state) {
 static void iqs9151_two_finger_reset(struct iqs9151_two_finger_state *state) {
     state->active = false;
     state->hold_sent = false;
+    state->tap_candidate = false;
     state->down_ms = 0;
     state->centroid_dx = 0;
     state->centroid_dy = 0;
@@ -721,8 +811,7 @@ static void iqs9151_two_finger_result_reset(struct iqs9151_two_finger_result *re
 static bool iqs9151_one_finger_update(struct iqs9151_data *data,
                                       const struct iqs9151_frame *frame,
                                       const struct iqs9151_frame *prev_frame,
-                                      const struct device *dev,
-                                      bool tap_guard) {
+                                      const struct device *dev) {
     struct iqs9151_one_finger_state *state = &data->one_finger;
     const bool one_now = frame->finger_count == 1U;
     const int64_t now_ms = k_uptime_get();
@@ -737,6 +826,9 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
         }
         state->active = true;
         state->hold_sent = false;
+        state->tap_candidate =
+            (prev_frame->finger_count == 0U) ||
+            iqs9151_has_recent_finger_count(data, 0U, now_ms, IQS9151_TAP_REENTRY_WINDOW_MS);
         state->down_ms = now_ms;
         state->dx = 0;
         state->dy = 0;
@@ -749,6 +841,8 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
     }
 
     if (one_now) {
+        const int64_t elapsed_ms = now_ms - state->down_ms;
+
         if (have_xy) {
             const int32_t step_x = (int32_t)x - (int32_t)state->last_x;
             const int32_t step_y = (int32_t)y - (int32_t)state->last_y;
@@ -758,34 +852,34 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
             state->last_y = y;
         }
 
+        if (state->tap_candidate &&
+            (elapsed_ms > IQS9151_TAP_MAX_MS ||
+             iqs9151_abs32(state->dx) > ONE_FINGER_TAP_MOVE ||
+             iqs9151_abs32(state->dy) > ONE_FINGER_TAP_MOVE)) {
+            state->tap_candidate = false;
+        }
+
         if (!state->hold_sent && IS_ENABLED(CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE)) {
-            const int64_t elapsed_ms = now_ms - state->down_ms;
-            if (elapsed_ms >= CONFIG_INPUT_IQS9151_PRESSHOLD_TIME_MS &&
+            const bool tap_possible = state->tap_candidate &&
+                                      elapsed_ms <= IQS9151_TAP_MAX_MS;
+            if (!tap_possible &&
+                elapsed_ms >= IQS9151_HOLD_MIN_MS &&
                 iqs9151_abs32(state->dx) <= ONE_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(state->dy) <= ONE_FINGER_HOLD_MOVE) {
-                if (data->hold_button == 0U) {
-                    input_report_key(dev, INPUT_BTN_0, true, true, K_FOREVER);
-                    data->hold_button = INPUT_BTN_0;
-                }
-                state->hold_sent = true;
+                state->hold_sent = iqs9151_emit_hold_press(data, dev, INPUT_BTN_0);
             }
         }
         return false;
     }
 
     released_from_hold = state->hold_sent;
-    if (frame->finger_count == 0U && !tap_guard && !state->hold_sent &&
+    if (frame->finger_count == 0U && !state->hold_sent && state->tap_candidate &&
         IS_ENABLED(CONFIG_INPUT_IQS9151_1F_TAP_ENABLE)) {
         const int64_t elapsed_ms = now_ms - state->down_ms;
-        if (elapsed_ms <= ONE_FINGER_TAP_TIME_MS &&
+        if (elapsed_ms <= IQS9151_TAP_MAX_MS &&
             iqs9151_abs32(state->dx) <= ONE_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->dy) <= ONE_FINGER_TAP_MOVE) {
-            const bool had_hold = data->hold_button != 0U;
-            iqs9151_release_hold(data, dev);
-            if (!had_hold) {
-                input_report_key(dev, INPUT_BTN_0, true, true, K_FOREVER);
-                input_report_key(dev, INPUT_BTN_0, false, true, K_FOREVER);
-            }
+            (void)iqs9151_emit_click(data, dev, INPUT_BTN_0);
         }
     }
 
@@ -797,7 +891,6 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
                                       const struct iqs9151_frame *frame,
                                       const struct iqs9151_frame *prev_frame,
                                       const struct device *dev,
-                                      bool tap_guard,
                                       struct iqs9151_two_finger_result *result) {
     struct iqs9151_two_finger_state *state = &data->two_finger;
     const bool two_now = frame->finger_count == 2U;
@@ -818,6 +911,9 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
         }
         state->active = true;
         state->hold_sent = false;
+        state->tap_candidate =
+            (prev_frame->finger_count == 0U) ||
+            iqs9151_has_recent_finger_count(data, 0U, now_ms, IQS9151_TAP_REENTRY_WINDOW_MS);
         state->down_ms = now_ms;
         state->centroid_dx = 0;
         state->centroid_dy = 0;
@@ -836,6 +932,7 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
     }
 
     if (two_now) {
+        const int64_t elapsed_ms = now_ms - state->down_ms;
         int32_t step_x = 0;
         int32_t step_y = 0;
         int32_t step_dist = 0;
@@ -857,18 +954,12 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
             state->distance_delta += step_dist;
         }
 
-        if (!state->hold_sent && IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE)) {
-            const int64_t elapsed_ms = now_ms - state->down_ms;
-            if (elapsed_ms >= CONFIG_INPUT_IQS9151_PRESSHOLD_TIME_MS &&
-                iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_HOLD_MOVE &&
-                iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_HOLD_MOVE &&
-                iqs9151_abs32(state->distance_delta) <= TWO_FINGER_HOLD_MOVE) {
-                if (data->hold_button == 0U) {
-                    input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
-                    data->hold_button = INPUT_BTN_1;
-                }
-                state->hold_sent = true;
-            }
+        if (state->tap_candidate &&
+            (elapsed_ms > IQS9151_TAP_MAX_MS ||
+             iqs9151_abs32(state->centroid_dx) > TWO_FINGER_TAP_MOVE ||
+             iqs9151_abs32(state->centroid_dy) > TWO_FINGER_TAP_MOVE ||
+             iqs9151_abs32(state->distance_delta) > TWO_FINGER_TAP_MOVE)) {
+            state->tap_candidate = false;
         }
 
         if (state->mode == IQS9151_2F_MODE_NONE) {
@@ -878,14 +969,29 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
             const bool scroll_enabled = IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE) ||
                                         IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE);
 
-            if (IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PINCH_ENABLE) &&
-                abs_dist >= TWO_FINGER_PINCH_START_DISTANCE &&
-                abs_dist > abs_center) {
-                state->mode = IQS9151_2F_MODE_PINCH;
-                result->pinch_started = true;
-            } else if (scroll_enabled && abs_center >= TWO_FINGER_SCROLL_START_MOVE) {
+            if (scroll_enabled && abs_center >= TWO_FINGER_SCROLL_START_MOVE) {
                 state->mode = IQS9151_2F_MODE_SCROLL;
                 result->scroll_started = true;
+                state->tap_candidate = false;
+            } else if (IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PINCH_ENABLE) &&
+                       abs_dist >= TWO_FINGER_PINCH_START_DISTANCE &&
+                       abs_dist > abs_center) {
+                state->mode = IQS9151_2F_MODE_PINCH;
+                result->pinch_started = true;
+                state->tap_candidate = false;
+            }
+        }
+
+        if (!state->hold_sent && state->mode == IQS9151_2F_MODE_NONE &&
+            IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE)) {
+            const bool tap_possible = state->tap_candidate &&
+                                      elapsed_ms <= IQS9151_TAP_MAX_MS;
+            if (!tap_possible &&
+                elapsed_ms >= IQS9151_HOLD_MIN_MS &&
+                iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_HOLD_MOVE &&
+                iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_HOLD_MOVE &&
+                iqs9151_abs32(state->distance_delta) <= TWO_FINGER_HOLD_MOVE) {
+                state->hold_sent = iqs9151_emit_hold_press(data, dev, INPUT_BTN_1);
             }
         }
 
@@ -915,44 +1021,26 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
         result->pinch_ended = true;
     }
 
-    if (frame->finger_count < 2U && !tap_guard && !state->hold_sent &&
-        state->mode == IQS9151_2F_MODE_NONE &&
+    if (frame->finger_count == 0U && !state->hold_sent &&
+        state->mode == IQS9151_2F_MODE_NONE && state->tap_candidate &&
         IS_ENABLED(CONFIG_INPUT_IQS9151_2F_TAP_ENABLE)) {
         const int64_t elapsed_ms = now_ms - state->down_ms;
-        if (elapsed_ms <= TWO_FINGER_TAP_TIME_MS &&
+        if (elapsed_ms <= IQS9151_TAP_MAX_MS &&
             iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->distance_delta) <= TWO_FINGER_TAP_MOVE) {
-            const bool had_hold = data->hold_button != 0U;
-            iqs9151_release_hold(data, dev);
-            if (!had_hold) {
-                input_report_key(dev, INPUT_BTN_1, true, true, K_FOREVER);
-                input_report_key(dev, INPUT_BTN_1, false, true, K_FOREVER);
-            }
+            (void)iqs9151_emit_click(data, dev, INPUT_BTN_1);
         }
     }
 
     iqs9151_two_finger_reset(state);
 }
 
-static void iqs9151_one_finger_abort(struct iqs9151_data *data) {
-    iqs9151_one_finger_reset(&data->one_finger);
-}
-
-static void iqs9151_two_finger_abort(struct iqs9151_data *data,
-                                     const struct device *dev) {
-    if (data->two_finger.active &&
-        data->two_finger.mode == IQS9151_2F_MODE_PINCH) {
-        input_report_key(dev, INPUT_BTN_7, false, true, K_FOREVER);
-    }
-
-    iqs9151_two_finger_reset(&data->two_finger);
-}
-
 static void iqs9151_three_finger_reset(struct iqs9151_data *data) {
     data->three_active = false;
     data->three_hold_sent = false;
     data->three_swipe_sent = false;
+    data->three_tap_candidate = false;
     data->three_down_ms = 0;
     data->three_dx = 0;
     data->three_dy = 0;
@@ -967,10 +1055,16 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
     const bool finger1_valid = iqs9151_finger1_valid(frame);
 
     if (!data->three_active && frame->finger_count == 3U) {
+        const int64_t now_ms = k_uptime_get();
+
         data->three_active = true;
         data->three_hold_sent = false;
         data->three_swipe_sent = false;
-        data->three_down_ms = k_uptime_get();
+        data->three_tap_candidate =
+            (prev_frame->finger_count == 0U) ||
+            iqs9151_has_recent_finger_count(data, 0U, now_ms,
+                                            IQS9151_TAP_REENTRY_WINDOW_MS);
+        data->three_down_ms = now_ms;
         data->three_dx = 0;
         data->three_dy = 0;
         if (finger1_valid) {
@@ -987,6 +1081,8 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
     }
 
     if (frame->finger_count == 3U) {
+        const int64_t elapsed = k_uptime_get() - data->three_down_ms;
+
         if (finger1_valid) {
             int32_t dx = (int32_t)frame->finger1_x - (int32_t)data->three_last_x;
             int32_t dy = (int32_t)frame->finger1_y - (int32_t)data->three_last_y;
@@ -996,55 +1092,75 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
             data->three_last_y = frame->finger1_y;
         }
 
+        if (data->three_tap_candidate &&
+            (elapsed > IQS9151_TAP_MAX_MS ||
+             iqs9151_abs32(data->three_dx) > THREE_FINGER_TAP_MOVE ||
+             iqs9151_abs32(data->three_dy) > THREE_FINGER_TAP_MOVE)) {
+            data->three_tap_candidate = false;
+        }
+
         if (!data->three_swipe_sent && !data->three_hold_sent) {
-            if (iqs9151_abs32(data->three_dx) >= CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD &&
-                iqs9151_abs32(data->three_dx) >= iqs9151_abs32(data->three_dy)) {
-                uint16_t key = (data->three_dx < 0) ? INPUT_BTN_4 : INPUT_BTN_3;
-                input_report_key(dev, key, true, true, K_FOREVER);
-                input_report_key(dev, key, false, true, K_FOREVER);
-                data->three_swipe_sent = true;
-            } else if (iqs9151_abs32(data->three_dy) >= CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD &&
-                       iqs9151_abs32(data->three_dy) > iqs9151_abs32(data->three_dx)) {
-                uint16_t key = (data->three_dy < 0) ? INPUT_BTN_5 : INPUT_BTN_6;
-                input_report_key(dev, key, true, true, K_FOREVER);
-                input_report_key(dev, key, false, true, K_FOREVER);
-                data->three_swipe_sent = true;
+            const bool tap_possible = data->three_tap_candidate &&
+                                      elapsed <= IQS9151_TAP_MAX_MS;
+            if (!tap_possible &&
+                elapsed >= IQS9151_HOLD_MIN_MS &&
+                iqs9151_abs32(data->three_dx) <= THREE_FINGER_HOLD_MOVE &&
+                iqs9151_abs32(data->three_dy) <= THREE_FINGER_HOLD_MOVE) {
+                data->three_hold_sent = iqs9151_emit_hold_press(data, dev, INPUT_BTN_2);
             }
         }
 
         if (!data->three_swipe_sent && !data->three_hold_sent) {
-            const int64_t elapsed = k_uptime_get() - data->three_down_ms;
-            if (elapsed >= THREE_FINGER_HOLD_TIME_MS &&
-                iqs9151_abs32(data->three_dx) <= THREE_FINGER_HOLD_MOVE &&
-                iqs9151_abs32(data->three_dy) <= THREE_FINGER_HOLD_MOVE) {
-                if (data->hold_button == 0U) {
-                    input_report_key(dev, INPUT_BTN_2, true, true, K_FOREVER);
-                    data->hold_button = INPUT_BTN_2;
-                }
-                data->three_hold_sent = true;
+            if (iqs9151_abs32(data->three_dx) >= CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD &&
+                iqs9151_abs32(data->three_dx) >= iqs9151_abs32(data->three_dy)) {
+                const uint16_t key = (data->three_dx < 0) ? INPUT_BTN_4 : INPUT_BTN_3;
+                input_report_key(dev, key, true, true, K_FOREVER);
+                input_report_key(dev, key, false, true, K_FOREVER);
+                data->three_swipe_sent = true;
+                iqs9151_three_finger_reset(data);
+                return true;
+            } else if (iqs9151_abs32(data->three_dy) >= CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD &&
+                       iqs9151_abs32(data->three_dy) > iqs9151_abs32(data->three_dx)) {
+                const uint16_t key = (data->three_dy < 0) ? INPUT_BTN_5 : INPUT_BTN_6;
+                input_report_key(dev, key, true, true, K_FOREVER);
+                input_report_key(dev, key, false, true, K_FOREVER);
+                data->three_swipe_sent = true;
+                iqs9151_three_finger_reset(data);
+                return true;
             }
         }
         return true;
     }
 
     if (IS_ENABLED(CONFIG_INPUT_IQS9151_3F_TAP_ENABLE) &&
-        !data->three_hold_sent && !data->three_swipe_sent) {
+        !data->three_hold_sent && !data->three_swipe_sent &&
+        data->three_tap_candidate && frame->finger_count == 0U) {
         const int64_t elapsed = k_uptime_get() - data->three_down_ms;
-        if (elapsed <= THREE_FINGER_TAP_TIME_MS &&
+        if (elapsed <= IQS9151_TAP_MAX_MS &&
             iqs9151_abs32(data->three_dx) <= THREE_FINGER_TAP_MOVE &&
             iqs9151_abs32(data->three_dy) <= THREE_FINGER_TAP_MOVE) {
-            const bool had_hold = data->hold_button != 0U;
-            iqs9151_release_hold(data, dev);
-            if (!had_hold) {
-                input_report_key(dev, INPUT_BTN_2, true, true, K_FOREVER);
-                input_report_key(dev, INPUT_BTN_2, false, true, K_FOREVER);
-            }
+            (void)iqs9151_emit_click(data, dev, INPUT_BTN_2);
         }
     }
 
-    data->three_guard_frames = THREE_FINGER_TAP_GUARD_FRAMES;
     iqs9151_three_finger_reset(data);
     return true;
+}
+
+static void iqs9151_reset_gesture_states(struct iqs9151_data *data,
+                                         const struct device *dev,
+                                         bool release_hold) {
+    if (data->two_finger.active && data->two_finger.mode == IQS9151_2F_MODE_PINCH) {
+        input_report_key(dev, INPUT_BTN_7, false, true, K_FOREVER);
+    }
+    if (release_hold) {
+        iqs9151_release_hold(data, dev);
+    }
+
+    iqs9151_one_finger_reset(&data->one_finger);
+    iqs9151_two_finger_reset(&data->two_finger);
+    iqs9151_three_finger_reset(data);
+    iqs9151_reset_finger_history(data);
 }
 
 static void iqs9151_inertia_start(struct iqs9151_inertia_state *state,
@@ -1203,7 +1319,9 @@ static void iqs9151_work_cb(struct k_work *work) {
     struct iqs9151_frame frame;
     struct iqs9151_frame prev_frame;
     struct iqs9151_two_finger_result two_result;
+    bool released_from_hold = false;
     int ret;
+    const int64_t now_ms = k_uptime_get();
 
     /* Read RelativeX(0x1014) .. Finger2Y(0x102E) in one transaction. */
     ret = iqs9151_i2c_read(cfg, IQS9151_ADDR_RELATIVE_X, raw_frame, sizeof(raw_frame));
@@ -1214,21 +1332,52 @@ static void iqs9151_work_cb(struct k_work *work) {
 
     iqs9151_parse_frame(raw_frame, &frame);
     prev_frame = data->prev_frame;
-    const bool tap_guard = data->three_guard_frames > 0U;
     const bool cursor_moving =
         (frame.trackpad_flags & IQS9151_TP_MOVEMENT_DETECTED) != 0U;
+    iqs9151_two_finger_result_reset(&two_result);
 
     if (frame.info_flags & IQS9151_INFO_SHOW_RESET) {
-        uint16_t gesture_enable = 0U;
-        uint16_t two_finger_enable = 0U;
-        (void)iqs9151_read_u16(cfg, IQS9151_ADDR_GESTURE_ENABLE, &gesture_enable);
-        (void)iqs9151_read_u16(cfg, IQS9151_ADDR_TWO_FINGER_GESTURE_ENABLE, &two_finger_enable);
-        LOG_WRN("SHOW_RESET detected: info=0x%04x gesture_en=0x%04x two_finger_en=0x%04x",
-                frame.info_flags, gesture_enable, two_finger_enable);
+        LOG_WRN("SHOW_RESET detected: info=0x%04x", frame.info_flags);
+        iqs9151_reset_gesture_states(data, dev, true);
+        iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
+        iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+        iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+        memset(&data->prev_frame, 0, sizeof(data->prev_frame));
         return;
     }
 
-    iqs9151_two_finger_update(data, &frame, &prev_frame, dev, tap_guard, &two_result);
+    if (frame.finger_count != 1U && data->one_finger.active) {
+        released_from_hold = iqs9151_one_finger_update(data, &frame, &prev_frame, dev);
+    }
+    if (frame.finger_count != 2U && data->two_finger.active) {
+        iqs9151_two_finger_update(data, &frame, &prev_frame, dev, &two_result);
+    }
+    if (frame.finger_count != 3U && data->three_active) {
+        (void)iqs9151_three_finger_update(data, &frame, &prev_frame, dev);
+    }
+
+    switch (frame.finger_count) {
+    case 1U:
+        released_from_hold = iqs9151_one_finger_update(data, &frame, &prev_frame, dev);
+        break;
+    case 2U:
+        iqs9151_two_finger_update(data, &frame, &prev_frame, dev, &two_result);
+        break;
+    case 3U:
+        (void)iqs9151_three_finger_update(data, &frame, &prev_frame, dev);
+        break;
+    default:
+        break;
+    }
+
+    if (frame.finger_count == 3U || data->three_active) {
+        iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
+        iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+        iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    }
+
     if (two_result.pinch_started) {
         input_report_key(dev, INPUT_BTN_7, true, true, K_FOREVER);
     }
@@ -1236,74 +1385,36 @@ static void iqs9151_work_cb(struct k_work *work) {
         input_report_key(dev, INPUT_BTN_7, false, true, K_FOREVER);
     }
 
-    if (two_result.scroll_ended || (prev_frame.finger_count == 2U && frame.finger_count <= 1U)) {
-        data->cursor_guard_frames = CURSOR_GUARD_FRAMES;
-        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    if (data->one_finger.active && data->one_finger.hold_sent) {
         iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
     }
-    const bool cursor_guard_active = data->cursor_guard_frames > 0U;
 
-    // ThreeFingerGestures(Custom)
-    const bool three_candidate = (frame.finger_count == 3U) || data->three_active;
-    if (three_candidate) {
-        iqs9151_one_finger_abort(data);
-        iqs9151_two_finger_abort(data, dev);
-        iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
-        iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
-        iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
-        iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
-    }
-    const bool three_consumed =
-        three_candidate ? iqs9151_three_finger_update(data, &frame, &prev_frame, dev) : false;
-
-    if (tap_guard) {
-        LOG_DBG("tap_guard active: frames=%u", data->three_guard_frames);
-    }
-
-    bool released_from_hold = false;
-    if (!three_consumed) {
-        released_from_hold =
-            iqs9151_one_finger_update(data, &frame, &prev_frame, dev, tap_guard);
-
-        if (data->one_finger.active && data->one_finger.hold_sent) {
-            iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+    if (two_result.pinch_active) {
+        if (two_result.pinch_wheel != 0) {
+            input_report_rel(dev, INPUT_REL_WHEEL, two_result.pinch_wheel, true, K_NO_WAIT);
         }
-
-        if (two_result.pinch_active) {
-            if (two_result.pinch_wheel != 0) {
-                input_report_rel(dev, INPUT_REL_WHEEL, two_result.pinch_wheel, true, K_NO_WAIT);
-            }
-        } else if (two_result.scroll_active) {
-            const bool have_x = two_result.scroll_x != 0;
-            const bool have_y = two_result.scroll_y != 0;
-            if (have_x) {
-                input_report_rel(dev, INPUT_REL_HWHEEL, (int16_t)(-two_result.scroll_x),
-                                 !have_y, K_NO_WAIT);
-            }
-            if (have_y) {
-                input_report_rel(dev, INPUT_REL_WHEEL, two_result.scroll_y, true, K_NO_WAIT);
-            }
-        } else if (!cursor_guard_active &&
-                   frame.finger_count == 1U && cursor_moving) {
-            input_report_rel(dev, INPUT_REL_X, frame.rel_x, false, K_NO_WAIT);
-            input_report_rel(dev, INPUT_REL_Y, frame.rel_y, true, K_NO_WAIT);
+    } else if (two_result.scroll_active) {
+        const bool have_x = two_result.scroll_x != 0;
+        const bool have_y = two_result.scroll_y != 0;
+        if (have_x) {
+            input_report_rel(dev, INPUT_REL_HWHEEL, (int16_t)(-two_result.scroll_x),
+                             !have_y, K_NO_WAIT);
         }
+        if (have_y) {
+            input_report_rel(dev, INPUT_REL_WHEEL, two_result.scroll_y, true, K_NO_WAIT);
+        }
+    } else if (frame.finger_count == 1U && cursor_moving) {
+        input_report_rel(dev, INPUT_REL_X, frame.rel_x, false, K_NO_WAIT);
+        input_report_rel(dev, INPUT_REL_Y, frame.rel_y, true, K_NO_WAIT);
     }
 
     LOG_DBG("rel x=%d y=%d info=0x%04x tp=0x%04x finger=%d f1x=%u f1y=%u f2x=%u f2y=%u",
             frame.rel_x, frame.rel_y, frame.info_flags, frame.trackpad_flags,
             frame.finger_count, frame.finger1_x, frame.finger1_y,
             frame.finger2_x, frame.finger2_y);
-    LOG_DBG("guard_frames: three=%u cursor=%u hold_button=0x%04x 2f_mode=%d",
-            data->three_guard_frames, data->cursor_guard_frames, data->hold_button,
+    LOG_DBG("gesture_state: hold_button=0x%04x 2f_mode=%d",
+            data->hold_button,
             data->two_finger.mode);
-    
-    if (data->three_guard_frames > 0U) {
-        data->three_guard_frames--;
-    }
-    if (data->cursor_guard_frames > 0U) {
-        data->cursor_guard_frames--;
-    }
 
     // Cancel Inertial 
     if (two_result.scroll_started || frame.finger_count == 2U) {
@@ -1321,7 +1432,7 @@ static void iqs9151_work_cb(struct k_work *work) {
     if (finger1_started) {
         iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
     }
-    if (frame.finger_count == 1U && cursor_moving && !cursor_guard_active) {
+    if (frame.finger_count == 1U && cursor_moving) {
         iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
         iqs9151_ema_update(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp,
                            frame.rel_x, frame.rel_y, iqs9151_cursor_params.ema_alpha);
@@ -1330,7 +1441,7 @@ static void iqs9151_work_cb(struct k_work *work) {
     // Inertial Cursolling
     const bool cursor_released =
         (prev_frame.finger_count == 1U) && (frame.finger_count == 0U);
-    if (cursor_released && !released_from_hold && !cursor_guard_active) {
+    if (cursor_released && !released_from_hold) {
         if (IS_ENABLED(CONFIG_INPUT_IQS9151_CURSOR_INERTIA_ENABLE)) {
             iqs9151_inertia_start(&data->inertia_cursor, &data->inertia_cursor_work,
                                   &iqs9151_cursor_params,
@@ -1353,6 +1464,7 @@ static void iqs9151_work_cb(struct k_work *work) {
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
     }
     iqs9151_update_prev_frame(data, &frame, &prev_frame);
+    iqs9151_push_finger_history(data, frame.finger_count, now_ms);
 }
 
 static void iqs9151_gpio_cb(const struct device *port, struct gpio_callback *cb, uint32_t pins) {
@@ -1626,25 +1738,6 @@ static int iqs9151_apply_kconfig_overrides(const struct device *dev) {
         return ret;
     }
 
-    ret = iqs9151_update_bits_u16(cfg, IQS9151_ADDR_GESTURE_ENABLE,
-                                  IQS9151_SFG_SINGLE_TAP | IQS9151_SFG_PRESS_HOLD,
-                                  0U);
-    if (ret != 0) {
-        LOG_ERR("Failed to disable IC 1F gesture flags (%d)", ret);
-        return ret;
-    }
-
-    ret = iqs9151_update_bits_u16(
-        cfg, IQS9151_ADDR_TWO_FINGER_GESTURE_ENABLE,
-        IQS9151_TFG_TWO_TAP | IQS9151_TFG_TWO_PRESS_HOLD |
-            IQS9151_TFG_ZOOM_IN | IQS9151_TFG_ZOOM_OUT |
-            IQS9151_TFG_VSCROLL | IQS9151_TFG_HSCROLL,
-        0U);
-    if (ret != 0) {
-        LOG_ERR("Failed to disable IC 2F gesture flags (%d)", ret);
-        return ret;
-    }
-
     return 0;
 }
 
@@ -1747,9 +1840,8 @@ static int iqs9151_init(const struct device *dev) {
     iqs9151_one_finger_reset(&data->one_finger);
     iqs9151_two_finger_reset(&data->two_finger);
     iqs9151_three_finger_reset(data);
-    data->three_guard_frames = 0U;
-    data->cursor_guard_frames = 0U;
     data->hold_button = 0U;
+    iqs9151_reset_finger_history(data);
     gpio_init_callback(&data->gpio_cb, iqs9151_gpio_cb,
                         BIT(cfg->irq_gpio.pin));
     ret = gpio_add_callback(cfg->irq_gpio.port, &data->gpio_cb);
