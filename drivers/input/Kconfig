@@ -13,7 +13,8 @@ if INPUT_IQS9151
 config INPUT_IQS9151_LOG_LEVEL
     int "IQS9151 log level"
     range 0 4
-    default INPUT_LOG_LEVEL
+    default INPUT_LOG_LEVEL if LOG
+    default 0
     help
       Log level for the IQS9151 driver module.
       0: none, 1: err, 2: wrn, 3: inf, 4: dbg.
