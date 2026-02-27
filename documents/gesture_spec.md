@@ -1,118 +1,160 @@
-﻿# IQS9151 Gesture Specification(Draft)
+# IQS9151 Gesture Specification (Implementation Synced)
 
-この文書は、`iqs9151_work_cb()` / `iqs9151_one_finger_update()` / `iqs9151_two_finger_update()` / `iqs9151_three_finger_update()` の仕様を整理するためのドラフト仕様書です。
+この文書は、`iqs9151_work_cb()` / `iqs9151_one_finger_update()` /
+`iqs9151_two_finger_update()` / `iqs9151_three_finger_update()` の
+**現実装準拠仕様**です。
 
 ## 0. 前提
 
-- IC内蔵ジェスチャレジスタ (`0x101C` / `0x101E`) は **使用しない**。
-- 初期化時に IC 内蔵ジェスチャ有効ビット (`0x11F6` / `0x11F8`) を強制disableすることは必須要件としない。
+- IC内蔵ジェスチャレジスタ (`0x101C` / `0x101E`) は使用しない。
 - 判定は `0x1014..0x102E` の座標・フラグを基準に、ドライバ側状態機械で行う。
-- 本文書は「実装」と「意図仕様」を一致させるための編集ベース。
+- `SHOW_RESET` 検出時は後続判定を打ち切り、状態を即時リセットする。
 
-## 1. 入力フレーム定義（メモリマップ基準）
+## 1. 入力フレーム
 
-|項目|アドレス|ビット/型|意味|利用有無|
-| - | - | - | - | - |
-|Relative X|`0x1014`|`int16`|相対X移動量|使用|
-|Relative Y|`0x1016`|`int16`|相対Y移動量|使用|
-|Info Flags|`0x1020`|`uint16`|`SHOW_RESET` 等|使用|
-|Trackpad Flags|`0x1022`|`uint16`|`finger_count` / `movement_detected` / confidence|使用|
-|Finger1 X/Y|`0x1024`/`0x1026`|`uint16`|1本指座標|使用|
-|Finger2 X/Y|`0x102C`/`0x102E`|`uint16`|2本指座標|使用|
-|Single Finger Gestures|`0x101C`|`uint16`|IC内蔵1Fジェスチャ|不使用|
-|Two-Finger Gestures|`0x101E`|`uint16`|IC内蔵2Fジェスチャ|不使用|
-
-## 2. 正規化ルール（座標有効性）
-
-|ルールID|条件|正規化ルール|備考|
+|項目|アドレス|型|意味|
 | - | - | - | - |
-|N-1|`finger_count == 0`|`prev_frame.finger1/2_x/y = 0`|リリース時リセット|
-|N-2|`finger1_confidence == 0` または `f1==0xFFFF`|`finger1` は `prev_frame` の値をフォールバック|`iqs9151_get_finger1_xy()` 想定|
-|N-3|`finger_count < 2`|`prev_frame.finger2_x/y = 0`|2本指未満でクリア|
-|N-4|`finger2_confidence == 0` または `f2==0xFFFF`|`finger2` は `prev_frame` をフォールバック|`iqs9151_get_finger2_xy()` 想定|
-|N-5|`SHOW_RESET` 検出|当該フレームの判定を中止し、全ジェスチャ状態をリセット|`hold_button` 押下中なら release を送出|
+|Relative X|`0x1014`|`int16`|相対X移動量|
+|Relative Y|`0x1016`|`int16`|相対Y移動量|
+|Info Flags|`0x1020`|`uint16`|`SHOW_RESET` 等|
+|Trackpad Flags|`0x1022`|`uint16`|`finger_count` / movement / confidence|
+|Finger1 X/Y|`0x1024` / `0x1026`|`uint16`|1本指座標|
+|Finger2 X/Y|`0x102C` / `0x102E`|`uint16`|2本指座標|
 
-## 3. ジェスチャ仕様サマリ（1F/2F/3F）
+## 2. 正規化ルール
 
-記載ルール:
-- 継続条件: その状態を次フレームでも維持し、内部状態を更新し続ける条件
-- 終了条件: 状態を抜ける条件。成立時に出力イベントを実行
-- 中断条件: 出力イベント無しで状態を中断
-- `SHOW_RESET` はフレーム処理冒頭で判定して return するため、以下の各条件式には含めない
-- 3Fの移動量は `finger1` 追跡で計算する（中心点は使わない）
+- `finger_count == 0` のとき、`prev_frame` の座標をクリアする。
+- `finger1` / `finger2` の confidence が無効、または座標が `0xFFFF` のとき、
+  `prev_frame` の値をフォールバックとして使う。
+- `SHOW_RESET` のとき:
+  - pinch中なら `INPUT_BTN_7` release を送る
+  - `hold_button` が押下中なら release を送る
+  - 1F/2F/3Fセッションと慣性状態をリセットする
 
-時間パラメータ（固定値。後でKconfig化予定）:
-- `TAP_MAX_MS = 150`
-- `HOLD_MIN_MS = 200`
-- `TAP_REENTRY_WINDOW_MS = 30`
+## 3. 判定パラメータ（固定値）
 
-|ジェスチャ|開始条件|継続条件|終了条件|中断条件|出力イベント|備考|
-| - | - | - | - | - | - | - |
-|1Fセッション|`finger_count==1`|`finger_count==1`|`finger_count!=1`|なし|`INPUT_REL_X/Y`|`finger1` の `dx/dy` と経過時間を蓄積。継続中はイベントをレポートし続ける|
-|1F Tap|`finger_count==1` かつ `直近TAP_REENTRY_WINDOW_MS以内にfinger_count==0` かつ 1F Tap閾値以内(`elapsed<=TAP_MAX_MS` かつ `abs(dx)<=ONE_FINGER_TAP_MOVE && abs(dy)<=ONE_FINGER_TAP_MOVE`)|finger_count==1 かつ 1F Tap閾値以内|`finger_count==0` かつ 1F Tap閾値以内|1F Tap閾値超え|`INPUT_BTN_0` click||
-|1F Hold|`finger_count==1` かつ `elapsed>=HOLD_MIN_MS` かつ `abs(dx)<=ONE_FINGER_HOLD_MOVE && abs(dy)<=ONE_FINGER_HOLD_MOVE` かつ 1F Tap未成立|Hold active 中は継続|**別Tapまたは別Holdが成立**|なし|`INPUT_BTN_0` press/release||
-|2Fセッション|`finger_count==2`|`finger_count==2`|`finger_count!=2`|なし|なし|中心点移動量・指間距離・経過時間を蓄積|
-|2F Tap|`finger_count==2` かつ `直近TAP_REENTRY_WINDOW_MS以内にfinger_count==0` かつ 2F Tap閾値以内（`elapsed<=TAP_MAX_MS` かつ `abs(centroid_dx)<=TWO_FINGER_TAP_MOVE && abs(centroid_dy)<=TWO_FINGER_TAP_MOVE && abs(distance_delta)<=TWO_FINGER_TAP_MOVE`）|直近TAP_REENTRY_WINDOW_MS以内にfinger_count==2 かつ 2F Tap閾値以内|`finger_count==0` かつ 2F Tap閾値以内|2F Scroll/2F Pinch確定、またはHold開始条件成立|`INPUT_BTN_1` click|履歴参照は `finger_count` のみ|
-|2F Hold|`finger_count==2` かつ `mode==NONE` かつ `elapsed>=HOLD_MIN_MS` かつ `abs(centroid_dx)<=TWO_FINGER_HOLD_MOVE && abs(centroid_dy)<=TWO_FINGER_HOLD_MOVE && abs(distance_delta)<=TWO_FINGER_HOLD_MOVE` かつ 2F Tap未成立|Hold active 中は継続|**別Tapまたは別Holdが成立**|2F Scroll/2F Pinch確定|`INPUT_BTN_1` press/release||
-|2F Scroll|`finger_count==2` かつ `mode==NONE` かつ `max(abs(centroid_dx),abs(centroid_dy))>=TWO_FINGER_SCROLL_START_MOVE`|`finger_count==2` かつ `mode==SCROLL`|`finger_count!=2`|なし|`REL_WHEEL/HWHEEL`|Pinchと排他。同時成立時はScroll優先でmode固定。継続中はイベントをレポートし続ける|
-|2F Pinch|`finger_count==2` かつ `mode==NONE` かつ `abs(distance_delta)>=TWO_FINGER_PINCH_START_DISTANCE` かつ `abs(distance_delta)>max(abs(centroid_dx),abs(centroid_dy))` かつ Scroll開始条件が未成立|`finger_count==2` かつ `mode==PINCH`|`finger_count!=2`|なし|`INPUT_BTN_7` press/release + `REL_WHEEL`|Scrollと排他。mode固定。継続中はイベントをレポートし続ける|
-|3Fセッション|`finger_count==3`|`finger_count==3`|`finger_count!=3`|なし|なし|`finger1` の `dx/dy` と経過時間を蓄積|
-|3F Tap|`finger_count==3` かつ `直近TAP_REENTRY_WINDOW_MS以内にfinger_count==0` かつ `elapsed<=TAP_MAX_MS` かつ `abs(dx)<=THREE_FINGER_TAP_MOVE && abs(dy)<=THREE_FINGER_TAP_MOVE`|開始条件を満たす間継続|`finger_count==0` かつ Tap条件成立|3F Swipe確定、または3F Hold開始条件成立|`INPUT_BTN_2` click|履歴参照は `finger_count` のみ|
-|3F Hold|`finger_count==3` かつ `elapsed>=HOLD_MIN_MS` かつ `abs(dx)<=THREE_FINGER_HOLD_MOVE && abs(dy)<=THREE_FINGER_HOLD_MOVE` かつ 3F Tap未成立|Hold active 中は継続|**別Tapまたは別Holdが成立**|なし|`INPUT_BTN_2` press/release|Swipeと同時成立時はHold優先|
-|3F Swipe|`finger_count==3` かつ (`abs(dx)>=CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD && abs(dx)>=abs(dy)` または `abs(dy)>=CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD && abs(dy)>abs(dx)`) かつ 3F Hold開始条件が未成立|継続なし（1ショット）|成立フレームで即終了|なし|左右: `BTN_3/4`、上下: `BTN_5/6` click|成立後は3Fセッションを即リセット|
+- 共通:
+  - `IQS9151_TAP_MAX_MS = 150` (1F/2F用)
+  - `IQS9151_HOLD_MIN_MS = 200`
+  - `IQS9151_TAP_REENTRY_WINDOW_MS = 30`
+- 2F:
+  - `TWO_FINGER_TAP_MOVE = 30`
+  - `TWO_FINGER_HOLD_MOVE = 40`
+  - `TWO_FINGER_SCROLL_START_MOVE = 50`
+  - `TWO_FINGER_PINCH_START_DISTANCE = 80`
+  - `TWO_FINGER_RELEASE_PENDING_MAX_MS = 150`
+  - `TWO_FINGER_ONE_LEAD_MAX_MS = 120`
+- 3F:
+  - `THREE_FINGER_TAP_MAX_MS = 180`
+  - `THREE_FINGER_TAP_MOVE = 30`
+  - `THREE_FINGER_HOLD_MOVE = 40`
+  - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150`
+  - `THREE_FINGER_ONE_LEAD_MAX_MS = 120`
+  - `THREE_FINGER_TWO_LEAD_MAX_MS = 120`
 
-## 4. 優先度・排他・中断
+## 4. ジェスチャ仕様
 
-|項目|仕様|
-| - | - |
-|本数別セッション|1フレームで処理する基底セッションは `finger_count` に対応する1種類のみ（1F/2F/3F）|
-|同一セッション内優先度|`Tap > Hold`|
-|2F Scroll/Pinch競合|同時成立時はScroll優先。確定後は排他ロック（終了までモード固定）|
-|Holdの単一性|`hold_button` は単一。別Tap/Hold成立条件を検出したフレームでは現Holdをreleaseし、新規Tap/Holdイベントは出力しない|
-|Hold継続|Holdは「別Tapまたは別Hold成立」まで継続する|
-|3F Hold/Swipe競合|同時成立時はHold優先|
-|累積値やステータスの状態|1F2F3Fセッション終了or中断時は状態をリセット|
-|SHOW_RESET処理位置|`work_cb` 冒頭で検出し、`hold_button` を release したうえで全ジェスチャ状態をリセットして return（後続条件分岐では参照しない）|
+### 4.1 1F
 
-## 5. 時間窓・履歴参照
+- 1F Tap:
+  - 候補開始: `finger_count==1` かつ
+    `prev==0` または `TAP_REENTRY_WINDOW_MS` 内に `finger_count==0`
+  - 成立: `finger_count==0` かつ
+    `elapsed<=IQS9151_TAP_MAX_MS` かつ `abs(dx/dy)<=ONE_FINGER_TAP_MOVE`
+  - 出力: `INPUT_BTN_0` click
+- 1F Hold:
+  - 条件: `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+    `abs(dx/dy)<=ONE_FINGER_HOLD_MOVE` かつ Tap未成立
+  - 出力: `INPUT_BTN_0` press（ラッチ）
 
-|項目|仕様|
-| - | - |
-|共通時間閾値|`TAP_MAX_MS=150` / `HOLD_MIN_MS=200` / `TAP_REENTRY_WINDOW_MS=30`|
-|履歴参照単位|フレーム数ではなく ms で判定する|
-|履歴内容|Tap判定の履歴参照は `finger_count` のみ（confidence/座標は参照しない）|
-|履歴バッファ|内部実装は最大5フレーム程度を想定（約50ms @10ms周期）|
-|2F/3F再エントリ|`2->1->2` などチャタリング遷移は `TAP_REENTRY_WINDOW_MS` 内ならTap候補に含める|
-|移動量閾値|既存定義値を流用（`ONE_FINGER_*` / `TWO_FINGER_*` / `THREE_FINGER_*`）|
+### 4.2 2F
 
-## 6. 出力イベント仕様（ZMK Input）
+- 2F Tap:
+  - 候補開始:
+    - `prev==0` または `TAP_REENTRY_WINDOW_MS` 内に `finger_count==0`
+    - または `1->2` one-lead が有効 (`TWO_FINGER_ONE_LEAD_MAX_MS` 内)
+  - 候補維持:
+    - `elapsed<=IQS9151_TAP_MAX_MS`
+    - `abs(centroid_dx/dy)<=TWO_FINGER_TAP_MOVE`
+    - `abs(distance_delta)<=TWO_FINGER_TAP_MOVE`
+  - 段階リリース:
+    - `2->1` で `release_pending` に入り、`TWO_FINGER_RELEASE_PENDING_MAX_MS` 以内の
+      `1->0` をTap成立として扱う
+  - 出力: `INPUT_BTN_1` click
+- 2F Hold:
+  - 条件: `mode==NONE` かつ `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+    `abs(centroid_dx/dy)<=TWO_FINGER_HOLD_MOVE` かつ
+    `abs(distance_delta)<=TWO_FINGER_HOLD_MOVE` かつ Tap未成立
+  - 出力: `INPUT_BTN_1` press（ラッチ）
+- 2F Scroll:
+  - 開始: `mode==NONE` かつ
+    `max(abs(centroid_dx), abs(centroid_dy)) >= TWO_FINGER_SCROLL_START_MOVE`
+  - 出力: `REL_HWHEEL` / `REL_WHEEL`（設定有効軸のみ）
+- 2F Pinch:
+  - 開始: `mode==NONE` かつ
+    `abs(distance_delta) >= TWO_FINGER_PINCH_START_DISTANCE` かつ
+    `abs(distance_delta) > max(abs(centroid_dx), abs(centroid_dy))`
+  - 出力: `INPUT_BTN_7` press/release + `REL_WHEEL`
+- Scroll/Pinch競合:
+  - 同時成立時は Scroll 優先で mode 固定
 
-|種別|イベント|トリガ|補足|
-| - | - | - | - |
-|Click|`INPUT_BTN_0`|1F Tap|press+release|
-|Click|`INPUT_BTN_1`|2F Tap|press+release|
-|Click|`INPUT_BTN_2`|3F Tap|press+release|
-|Hold|`INPUT_BTN_0`|1F Hold|`hold_button` 管理対象|
-|Hold|`INPUT_BTN_1`|2F Hold|`hold_button` 管理対象|
-|Hold|`INPUT_BTN_2`|3F Hold|`hold_button` 管理対象|
-|Swipe|`INPUT_BTN_3/4/5/6`|3F Swipe|方向別1ショット|
-|Pinch mode key|`INPUT_BTN_7`|2F Pinch開始/終了|状態同期キー|
-|Relative cursor|`INPUT_REL_X/Y`|1F セッション|Tap候補中も抑止しない|
-|Relative scroll|`INPUT_REL_WHEEL/HWHEEL`|2F Scroll/Pinch|PinchはWHEEL使用|
-|Inertia cursor|`INPUT_REL_X/Y` 継続|1F セッション終了時|Hold成立時は開始しない|
-|Inertia scroll|`INPUT_REL_WHEEL/HWHEEL` 継続|2F Scroll終了時|Pinchへの遷移では開始しない|
+### 4.3 3F
 
-## 7. 未決定項目（編集用）
+- 3F Tap:
+  - 候補開始:
+    - `prev==0` または `TAP_REENTRY_WINDOW_MS` 内に `finger_count==0`
+    - または `1->3` one-lead (`THREE_FINGER_ONE_LEAD_MAX_MS` 内)
+    - または `2->3` two-lead (`THREE_FINGER_TWO_LEAD_MAX_MS` 内、2F tap条件内)
+  - 候補維持:
+    - `elapsed<=THREE_FINGER_TAP_MAX_MS`
+    - `abs(dx/dy)<=THREE_FINGER_TAP_MOVE`（`finger1` 追跡）
+  - 段階リリース:
+    - `3->(2/1)` で `release_pending` に入り、
+      `THREE_FINGER_RELEASE_PENDING_MAX_MS` 以内の `->0` をTap成立として扱う
+  - 出力: `INPUT_BTN_2` click
+- 3F Hold:
+  - 条件: `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+    `abs(dx/dy)<=THREE_FINGER_HOLD_MOVE` かつ Tap未成立
+  - 出力: `INPUT_BTN_2` press（ラッチ）
+- 3F Swipe:
+  - 条件: `abs(dx)` または `abs(dy)` が
+    `CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD` を超過
+  - 出力: 方向別 `INPUT_BTN_3/4/5/6` click
+  - 1ショット: 成立後に `three_swipe_sent=true` を保持し、
+    3本指接触が終了するまで同一接触中は再送しない
+- Hold/Swipe競合:
+  - 同時成立時は Hold 優先
 
-|ID|論点|候補/メモ|決定値|
-| - | - | - | - |
-|D-1|Tap/Holdの閾値管理|現時点は固定値、最終的にKconfig化|`FIXED -> Kconfig`|
-|D-2|履歴管理実装|`prev_frame` 単体から時刻付きリングバッファへ拡張（最大5フレーム想定）|`時刻付きリングバッファ(最大5)`|
+## 5. 優先度・排他
 
-## 8. 改訂履歴
+- Tap/Hold競合は `tap_possible` 条件で排他し、Tap候補中はHoldを出さない。
+- `hold_button` は単一ラッチ。
+  別Tap/Hold成立時は先に既存holdをreleaseし、新イベントは同フレーム抑止する。
+- 遷移フレームでは、旧セッション終了処理と新セッション開始判定を同一フレームで扱う。
+  そのため `1->2`, `1->3`, `2->3` の lead 判定をサポートする。
 
-- 2026-02-25: 初版雛形作成
-- 2026-02-25: ユーザー回答反映（Tap>Hold>Rel、2F排他、ms窓、SHOW_RESET全リセット）
-- 2026-02-25: 条件式を具体化、時間閾値を確定（150/200/30）、Hold終了条件とSHOW_RESET記載方針を修正
-- 2026-02-25: 追加確定（1F再エントリ適用、Hold継続ルール、3F Hold優先）
-- 2026-02-25: 実装方針反映（SHOW_RESET時hold release、Rel抑止なし、履歴リング実装確定、IC gesture disable非必須）
+## 6. 出力イベント
+
+- Click:
+  - 1F Tap: `INPUT_BTN_0` (press + release)
+  - 2F Tap: `INPUT_BTN_1` (press + release)
+  - 3F Tap: `INPUT_BTN_2` (press + release)
+- Hold:
+  - 1F/2F/3F Hold: `INPUT_BTN_0/1/2` press（別Tap/Holdでrelease）
+- Swipe:
+  - 3F: `INPUT_BTN_3/4/5/6` click
+- Pinch:
+  - `INPUT_BTN_7` press/release + `REL_WHEEL`
+- Relative:
+  - 1Fで `REL_X/Y`
+  - 2F Scroll/Pinchで `REL_WHEEL/HWHEEL`
+
+## 7. 改訂履歴
+
+- 2026-02-25: 初版ドラフト
+- 2026-02-27: 実装追従更新
+  - 2F/3F の `release_pending` 記載追加
+  - 3F `TAP_MAX_MS=180` 記載
+  - 3F `1->3` / `2->3` lead 許容を記載
+  - 現在の閾値 (`SCROLL_START_MOVE=50`, `PINCH_START_DISTANCE=80`) に更新
+  - 3F Swipe の1ショット実装を `three_swipe_sent` ラッチ方式に更新
