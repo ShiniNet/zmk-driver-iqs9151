@@ -7,6 +7,7 @@
 ## 0. 前提
 
 - IC内蔵ジェスチャレジスタ (`0x101C` / `0x101E`) は使用しない。
+- IC側ジェスチャ設定ブロック (`0x11F6..0x1217`) への書き込みは行わない。
 - 判定は `0x1014..0x102E` の座標・フラグを基準に、ドライバ側状態機械で行う。
 - `SHOW_RESET` 検出時は後続判定を打ち切り、状態を即時リセットする。
 
@@ -31,26 +32,35 @@
   - `hold_button` が押下中なら release を送る
   - 1F/2F/3Fセッションと慣性状態をリセットする
 
-## 3. 判定パラメータ（固定値）
+## 3. 判定パラメータ（既定値）
 
 - 共通:
-  - `IQS9151_TAP_MAX_MS = 150` (1F/2F用)
-  - `IQS9151_HOLD_MIN_MS = 200`
-  - `IQS9151_TAP_REENTRY_WINDOW_MS = 30`
+  - `IQS9151_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_HOLD_MIN_MS`)
+  - `IQS9151_TAP_REENTRY_WINDOW_MS = 30` (固定)
+- 1F:
+  - `ONE_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS`)
+  - `ONE_FINGER_TAP_MOVE = 25` (`CONFIG_INPUT_IQS9151_1F_TAP_MOVE`)
+  - `ONE_FINGER_HOLD_MOVE = 30` (固定)
 - 2F:
-  - `TWO_FINGER_TAP_MOVE = 30`
-  - `TWO_FINGER_HOLD_MOVE = 40`
-  - `TWO_FINGER_SCROLL_START_MOVE = 50`
-  - `TWO_FINGER_PINCH_START_DISTANCE = 80`
-  - `TWO_FINGER_RELEASE_PENDING_MAX_MS = 150`
-  - `TWO_FINGER_ONE_LEAD_MAX_MS = 120`
+  - `TWO_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS`)
+  - `TWO_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_2F_TAP_MOVE`)
+  - `TWO_FINGER_HOLD_MOVE = 40` (固定)
+  - `TWO_FINGER_SCROLL_START_MOVE = 50` (`CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE`)
+  - `TWO_FINGER_PINCH_START_DISTANCE = 80` (`CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE`)
+  - `TWO_FINGER_RELEASE_PENDING_MAX_MS = 150` (固定)
+  - `TWO_FINGER_ONE_LEAD_MAX_MS = 120` (固定)
 - 3F:
-  - `THREE_FINGER_TAP_MAX_MS = 180`
-  - `THREE_FINGER_TAP_MOVE = 30`
-  - `THREE_FINGER_HOLD_MOVE = 40`
-  - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150`
-  - `THREE_FINGER_ONE_LEAD_MAX_MS = 120`
-  - `THREE_FINGER_TWO_LEAD_MAX_MS = 120`
+  - `THREE_FINGER_TAP_MAX_MS = 180` (`CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS`)
+  - `THREE_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_3F_TAP_MOVE`)
+  - `THREE_FINGER_HOLD_MOVE = 40` (固定)
+  - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150` (固定)
+  - `THREE_FINGER_ONE_LEAD_MAX_MS = 120` (固定)
+  - `THREE_FINGER_TWO_LEAD_MAX_MS = 120` (固定)
+
+### 3.1 Kconfig管理パラメータ（ジェスチャ関連）
+
+ドライバ全体の `Kconfig` 一覧は
+`documents/iqs9151_kconfig_reference.md` を参照してください。
 
 ## 4. ジェスチャ仕様
 
@@ -60,7 +70,7 @@
   - 候補開始: `finger_count==1` かつ
     `prev==0` または `TAP_REENTRY_WINDOW_MS` 内に `finger_count==0`
   - 成立: `finger_count==0` かつ
-    `elapsed<=IQS9151_TAP_MAX_MS` かつ `abs(dx/dy)<=ONE_FINGER_TAP_MOVE`
+    `elapsed<=ONE_FINGER_TAP_MAX_MS` かつ `abs(dx/dy)<=ONE_FINGER_TAP_MOVE`
   - 出力: `INPUT_BTN_0` click
 - 1F Hold:
   - 条件: `elapsed>=IQS9151_HOLD_MIN_MS` かつ
@@ -74,7 +84,7 @@
     - `prev==0` または `TAP_REENTRY_WINDOW_MS` 内に `finger_count==0`
     - または `1->2` one-lead が有効 (`TWO_FINGER_ONE_LEAD_MAX_MS` 内)
   - 候補維持:
-    - `elapsed<=IQS9151_TAP_MAX_MS`
+    - `elapsed<=TWO_FINGER_TAP_MAX_MS`
     - `abs(centroid_dx/dy)<=TWO_FINGER_TAP_MOVE`
     - `abs(distance_delta)<=TWO_FINGER_TAP_MOVE`
   - 段階リリース:
@@ -154,7 +164,9 @@
 - 2026-02-25: 初版ドラフト
 - 2026-02-27: 実装追従更新
   - 2F/3F の `release_pending` 記載追加
-  - 3F `TAP_MAX_MS=180` 記載
+  - `TAP_MAX_MS` を 1F/2F/3F で明示分離 (`150/150/180`)
+  - 高優先パラメータ（Tap時間/移動、Hold最短、2F Scroll開始、2F Pinch開始）を `Kconfig` 化
+  - `Kconfig` 管理の一覧を `documents/iqs9151_kconfig_reference.md` へ分割
   - 3F `1->3` / `2->3` lead 許容を記載
   - 現在の閾値 (`SCROLL_START_MOVE=50`, `PINCH_START_DISTANCE=80`) に更新
   - 3F Swipe の1ショット実装を `three_swipe_sent` ラッチ方式に更新

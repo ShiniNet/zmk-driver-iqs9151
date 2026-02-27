@@ -48,8 +48,9 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define CURSOR_INERTIA_START_THRESHOLD 2
 #define CURSOR_INERTIA_MIN_VELOCITY 2
 #define CURSOR_EMA_ALPHA 30
-#define IQS9151_TAP_MAX_MS 150
-#define IQS9151_HOLD_MIN_MS 200
+#define ONE_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS
+#define TWO_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS
+#define IQS9151_HOLD_MIN_MS CONFIG_INPUT_IQS9151_HOLD_MIN_MS
 #define IQS9151_TAP_REENTRY_WINDOW_MS 30
 #define TWO_FINGER_RELEASE_PENDING_MAX_MS 150
 #define THREE_FINGER_RELEASE_PENDING_MAX_MS 150
@@ -57,16 +58,23 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define THREE_FINGER_ONE_LEAD_MAX_MS 120
 #define THREE_FINGER_TWO_LEAD_MAX_MS 120
 #define IQS9151_FINGER_HISTORY_SIZE 5
-#define THREE_FINGER_TAP_MAX_MS 180
-#define THREE_FINGER_TAP_MOVE 30
+#define THREE_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS
+#define THREE_FINGER_TAP_MOVE CONFIG_INPUT_IQS9151_3F_TAP_MOVE
 #define THREE_FINGER_HOLD_MOVE 40
-#define ONE_FINGER_TAP_MOVE 25
+#define ONE_FINGER_TAP_MOVE CONFIG_INPUT_IQS9151_1F_TAP_MOVE
 #define ONE_FINGER_HOLD_MOVE 30
-#define TWO_FINGER_TAP_MOVE 30
+#define TWO_FINGER_TAP_MOVE CONFIG_INPUT_IQS9151_2F_TAP_MOVE
 #define TWO_FINGER_HOLD_MOVE 40
-#define TWO_FINGER_SCROLL_START_MOVE 50
-#define TWO_FINGER_PINCH_START_DISTANCE 80
+#define TWO_FINGER_SCROLL_START_MOVE CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE
+#define TWO_FINGER_PINCH_START_DISTANCE CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE
 #define TWO_FINGER_PINCH_WHEEL_DIV 12
+
+BUILD_ASSERT(CONFIG_INPUT_IQS9151_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS,
+             "HOLD_MIN_MS must be >= 1F_TAP_MAX_MS");
+BUILD_ASSERT(CONFIG_INPUT_IQS9151_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS,
+             "HOLD_MIN_MS must be >= 2F_TAP_MAX_MS");
+BUILD_ASSERT(CONFIG_INPUT_IQS9151_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS,
+             "HOLD_MIN_MS must be >= 3F_TAP_MAX_MS");
 
 struct iqs9151_config {
     struct i2c_dt_spec i2c;
@@ -369,42 +377,6 @@ static const uint8_t iqs9151_main_config[] = {
     Y_TRIM_VALUE,
     JITTER_FILTER_DELTA,
     FINGER_CONFIDENCE_THRESHOLD,
-};
-static const uint8_t iqs9151_gesture_config[] = {
-    GESTURE_ENABLE_0,
-    GESTURE_ENABLE_1,
-    GESTURE_ENABLE_2F_0,
-    GESTURE_ENABLE_2F_1,
-    TAP_TOUCH_TIME_0,
-    TAP_TOUCH_TIME_1,
-    TAP_WAIT_TIME_0,
-    TAP_WAIT_TIME_1,
-    TAP_DISTANCE_0,
-    TAP_DISTANCE_1,
-    HOLD_TIME_0,
-    HOLD_TIME_1,
-    SWIPE_TIME_0,
-    SWIPE_TIME_1,
-    SWIPE_X_DISTANCE_0,
-    SWIPE_X_DISTANCE_1,
-    SWIPE_Y_DISTANCE_0,
-    SWIPE_Y_DISTANCE_1,
-    SWIPE_X_CONS_DIST_0,
-    SWIPE_X_CONS_DIST_1,
-    SWIPE_Y_CONS_DIST_0,
-    SWIPE_Y_CONS_DIST_1,
-    SWIPE_ANGLE,
-    SCROLL_ANGLE,
-    ZOOM_INIT_DIST_0,
-    ZOOM_INIT_DIST_1,
-    ZOOM_CONSECUTIVE_DIST_0,
-    ZOOM_CONSECUTIVE_DIST_1,
-    SCROLL_INIT_DIST_0,
-    SCROLL_INIT_DIST_1,
-    SCROLL_CONSECUTIVE_DIST_0,
-    SCROLL_CONSECUTIVE_DIST_1,
-    PALM_GESTURE_THRESHOLD_0,
-    PALM_GESTURE_THRESHOLD_1,
 };
 static const uint8_t iqs9151_rxtx_map[] = {
     RX_TX_MAP_0,  RX_TX_MAP_1,  RX_TX_MAP_2,  RX_TX_MAP_3,  RX_TX_MAP_4,
@@ -917,7 +889,7 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
         }
 
         if (state->tap_candidate &&
-            (elapsed_ms > IQS9151_TAP_MAX_MS ||
+            (elapsed_ms > ONE_FINGER_TAP_MAX_MS ||
              iqs9151_abs32(state->dx) > ONE_FINGER_TAP_MOVE ||
              iqs9151_abs32(state->dy) > ONE_FINGER_TAP_MOVE)) {
             state->tap_candidate = false;
@@ -925,7 +897,7 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
 
         if (!state->hold_sent && IS_ENABLED(CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE)) {
             const bool tap_possible = state->tap_candidate &&
-                                      elapsed_ms <= IQS9151_TAP_MAX_MS;
+                                      elapsed_ms <= ONE_FINGER_TAP_MAX_MS;
             if (!tap_possible &&
                 elapsed_ms >= IQS9151_HOLD_MIN_MS &&
                 iqs9151_abs32(state->dx) <= ONE_FINGER_HOLD_MOVE &&
@@ -940,7 +912,7 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
     if (frame->finger_count == 0U && !state->hold_sent && state->tap_candidate &&
         IS_ENABLED(CONFIG_INPUT_IQS9151_1F_TAP_ENABLE)) {
         const int64_t elapsed_ms = now_ms - state->down_ms;
-        if (elapsed_ms <= IQS9151_TAP_MAX_MS &&
+        if (elapsed_ms <= ONE_FINGER_TAP_MAX_MS &&
             iqs9151_abs32(state->dx) <= ONE_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->dy) <= ONE_FINGER_TAP_MOVE) {
             (void)iqs9151_emit_click(data, dev, INPUT_BTN_0);
@@ -1031,7 +1003,7 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
         }
 
         if (state->tap_candidate &&
-            (elapsed_ms > IQS9151_TAP_MAX_MS ||
+            (elapsed_ms > TWO_FINGER_TAP_MAX_MS ||
              iqs9151_abs32(state->centroid_dx) > TWO_FINGER_TAP_MOVE ||
              iqs9151_abs32(state->centroid_dy) > TWO_FINGER_TAP_MOVE ||
              iqs9151_abs32(state->distance_delta) > TWO_FINGER_TAP_MOVE)) {
@@ -1061,7 +1033,7 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
         if (!state->hold_sent && state->mode == IQS9151_2F_MODE_NONE &&
             IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE)) {
             const bool tap_possible = state->tap_candidate &&
-                                      elapsed_ms <= IQS9151_TAP_MAX_MS;
+                                      elapsed_ms <= TWO_FINGER_TAP_MAX_MS;
             if (!tap_possible &&
                 elapsed_ms >= IQS9151_HOLD_MIN_MS &&
                 iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_HOLD_MOVE &&
@@ -1124,7 +1096,7 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
         const int64_t elapsed_ms = now_ms - state->down_ms;
 
         if (frame->finger_count == 1U &&
-            elapsed_ms <= IQS9151_TAP_MAX_MS &&
+            elapsed_ms <= TWO_FINGER_TAP_MAX_MS &&
             iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->distance_delta) <= TWO_FINGER_TAP_MOVE) {
@@ -1134,7 +1106,7 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
         }
 
         if (frame->finger_count == 0U &&
-            elapsed_ms <= IQS9151_TAP_MAX_MS &&
+            elapsed_ms <= TWO_FINGER_TAP_MAX_MS &&
             iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(state->distance_delta) <= TWO_FINGER_TAP_MOVE) {
@@ -1915,12 +1887,6 @@ static int iqs9151_configure(const struct device *dev) {
     if (ret) {
         return ret;
     }
-    ret = iqs9151_write_chunks(dev, cfg, IQS9151_ADDR_GESTURE_ENABLE,
-                                    iqs9151_gesture_config,
-                                    ARRAY_SIZE(iqs9151_gesture_config));
-    if (ret) {
-        return ret;
-    }
     ret = iqs9151_write_chunks(dev, cfg, IQS9151_ADDR_RX_TX_MAPPING,
                                     iqs9151_rxtx_map,
                                     ARRAY_SIZE(iqs9151_rxtx_map));
@@ -2009,13 +1975,6 @@ static int iqs9151_apply_kconfig_overrides(const struct device *dev) {
         (const uint8_t[]){(uint8_t)CONFIG_INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_BETA}, 1);
     if (ret != 0) {
         LOG_ERR("Failed to apply dynamic filter bottom beta (%d)", ret);
-        return ret;
-    }
-
-    ret = iqs9151_write_u16(cfg, IQS9151_ADDR_HOLD_TIME,
-                            (uint16_t)CONFIG_INPUT_IQS9151_PRESSHOLD_TIME_MS);
-    if (ret != 0) {
-        LOG_ERR("Failed to apply hold time (%d)", ret);
         return ret;
     }
 
