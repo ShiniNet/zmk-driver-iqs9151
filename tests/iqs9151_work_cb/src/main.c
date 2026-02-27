@@ -190,6 +190,29 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_pinch_reports_btn7_and_wheel) {
     zassert_equal(fixture->log.events[2].value, 0, "Event[2] should be BTN7 release");
 }
 
+ZTEST_F(iqs9151_work_cb, test_two_finger_pinch_to_three_finger_releases_btn7) {
+    const struct iqs9151_test_frame two_start =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame two_pinch =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 60, 100, 240, 100);
+    const struct iqs9151_test_frame three_start =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 100, 100, 200, 100);
+
+    iqs9151_test_process_frame(fixture->ctx, &two_start, 0);
+    iqs9151_test_process_frame(fixture->ctx, &two_pinch, 10);
+    iqs9151_test_process_frame(fixture->ctx, &three_start, 20);
+
+    zassert_equal(fixture->log.count, 3U,
+                  "Expected BTN7 press, wheel, BTN7 release on 2F->3F transition");
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
+    zassert_equal(fixture->log.events[2].code, INPUT_BTN_7, "Event[2] unexpected code");
+    zassert_equal(fixture->log.events[2].value, 0, "Event[2] should be BTN7 release");
+}
+
 ZTEST_F(iqs9151_work_cb, test_two_finger_tap_click_emits_btn1) {
     const struct iqs9151_test_frame two_start =
         make_frame(2U,

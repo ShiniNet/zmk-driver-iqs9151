@@ -1518,6 +1518,17 @@ static bool iqs9151_update_gesture_sessions(struct iqs9151_data *data,
             iqs9151_abs32(data->two_finger.centroid_dx) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(data->two_finger.centroid_dy) <= TWO_FINGER_TAP_MOVE &&
             iqs9151_abs32(data->two_finger.distance_delta) <= TWO_FINGER_TAP_MOVE;
+
+        if (data->two_finger.mode == IQS9151_2F_MODE_SCROLL) {
+            two_result->scroll_ended = true;
+        } else if (data->two_finger.mode == IQS9151_2F_MODE_PINCH) {
+            two_result->pinch_ended = true;
+        }
+        if (data->two_finger.hold_sent) {
+            iqs9151_release_hold(data, dev);
+            released_from_hold = true;
+        }
+
         iqs9151_two_finger_reset(&data->two_finger);
         data->two_finger_one_lead_valid = false;
     } else {
