@@ -100,6 +100,7 @@ struct iqs9151_one_finger_state {
     bool active;
     bool hold_sent;
     bool tap_candidate;
+    bool hold_candidate;
     int64_t down_ms;
     int32_t dx;
     int32_t dy;
@@ -110,6 +111,7 @@ struct iqs9151_two_finger_state {
     bool active;
     bool hold_sent;
     bool tap_candidate;
+    bool hold_candidate;
     bool release_pending;
     int64_t down_ms;
     int64_t release_pending_ms;
@@ -180,6 +182,7 @@ struct iqs9151_data {
     bool three_hold_sent;
     bool three_swipe_sent;
     bool three_tap_candidate;
+    bool three_hold_candidate;
     bool three_release_pending;
     bool three_have_last;
     int64_t three_down_ms;
@@ -816,6 +819,7 @@ static void iqs9151_one_finger_reset(struct iqs9151_one_finger_state *state) {
     state->active = false;
     state->hold_sent = false;
     state->tap_candidate = false;
+    state->hold_candidate = false;
     state->down_ms = 0;
     state->dx = 0;
     state->dy = 0;
@@ -827,6 +831,7 @@ static void iqs9151_two_finger_reset(struct iqs9151_two_finger_state *state) {
     state->active = false;
     state->hold_sent = false;
     state->tap_candidate = false;
+    state->hold_candidate = false;
     state->release_pending = false;
     state->down_ms = 0;
     state->release_pending_ms = 0;
@@ -865,6 +870,7 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
         state->tap_candidate =
             (prev_frame->finger_count == 0U) ||
             iqs9151_has_recent_finger_count(data, 0U, now_ms, IQS9151_TAP_REENTRY_WINDOW_MS);
+        state->hold_candidate = true;
         state->down_ms = now_ms;
         state->dx = 0;
         state->dy = 0;
@@ -894,11 +900,17 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
              iqs9151_abs32(state->dy) > ONE_FINGER_TAP_MOVE)) {
             state->tap_candidate = false;
         }
+        if (state->hold_candidate &&
+            (iqs9151_abs32(state->dx) > ONE_FINGER_HOLD_MOVE ||
+             iqs9151_abs32(state->dy) > ONE_FINGER_HOLD_MOVE)) {
+            state->hold_candidate = false;
+        }
 
         if (!state->hold_sent && IS_ENABLED(CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE)) {
             const bool tap_possible = state->tap_candidate &&
                                       elapsed_ms <= ONE_FINGER_TAP_MAX_MS;
-            if (!tap_possible &&
+            if (state->hold_candidate &&
+                !tap_possible &&
                 elapsed_ms >= IQS9151_HOLD_MIN_MS &&
                 iqs9151_abs32(state->dx) <= ONE_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(state->dy) <= ONE_FINGER_HOLD_MOVE) {
@@ -952,6 +964,7 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
             (prev_frame->finger_count == 0U) ||
             iqs9151_has_recent_finger_count(data, 0U, now_ms, IQS9151_TAP_REENTRY_WINDOW_MS) ||
             one_lead_tap_candidate;
+        state->hold_candidate = true;
         state->release_pending = false;
         state->down_ms = now_ms;
         state->release_pending_ms = 0;
@@ -1009,6 +1022,12 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
              iqs9151_abs32(state->distance_delta) > TWO_FINGER_TAP_MOVE)) {
             state->tap_candidate = false;
         }
+        if (state->hold_candidate &&
+            (iqs9151_abs32(state->centroid_dx) > TWO_FINGER_HOLD_MOVE ||
+             iqs9151_abs32(state->centroid_dy) > TWO_FINGER_HOLD_MOVE ||
+             iqs9151_abs32(state->distance_delta) > TWO_FINGER_HOLD_MOVE)) {
+            state->hold_candidate = false;
+        }
 
         if (state->mode == IQS9151_2F_MODE_NONE) {
             const int32_t abs_center =
@@ -1034,7 +1053,8 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
             IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE)) {
             const bool tap_possible = state->tap_candidate &&
                                       elapsed_ms <= TWO_FINGER_TAP_MAX_MS;
-            if (!tap_possible &&
+            if (state->hold_candidate &&
+                !tap_possible &&
                 elapsed_ms >= IQS9151_HOLD_MIN_MS &&
                 iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_HOLD_MOVE &&
@@ -1122,6 +1142,7 @@ static void iqs9151_three_finger_reset(struct iqs9151_data *data) {
     data->three_hold_sent = false;
     data->three_swipe_sent = false;
     data->three_tap_candidate = false;
+    data->three_hold_candidate = false;
     data->three_release_pending = false;
     data->three_have_last = false;
     data->three_down_ms = 0;
@@ -1151,6 +1172,7 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
                                             IQS9151_TAP_REENTRY_WINDOW_MS) ||
             one_lead_tap_candidate ||
             two_lead_tap_candidate;
+        data->three_hold_candidate = true;
         data->three_release_pending = false;
         data->three_have_last = false;
         data->three_down_ms = now_ms;
@@ -1203,11 +1225,17 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
              iqs9151_abs32(data->three_dy) > THREE_FINGER_TAP_MOVE)) {
             data->three_tap_candidate = false;
         }
+        if (data->three_hold_candidate &&
+            (iqs9151_abs32(data->three_dx) > THREE_FINGER_HOLD_MOVE ||
+             iqs9151_abs32(data->three_dy) > THREE_FINGER_HOLD_MOVE)) {
+            data->three_hold_candidate = false;
+        }
 
         if (!data->three_swipe_sent && !data->three_hold_sent) {
             const bool tap_possible = data->three_tap_candidate &&
                                       elapsed <= THREE_FINGER_TAP_MAX_MS;
-            if (!tap_possible &&
+            if (data->three_hold_candidate &&
+                !tap_possible &&
                 elapsed >= IQS9151_HOLD_MIN_MS &&
                 iqs9151_abs32(data->three_dx) <= THREE_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(data->three_dy) <= THREE_FINGER_HOLD_MOVE) {
@@ -2147,6 +2175,14 @@ void iqs9151_test_context_init(void *ctx, const struct device *dev) {
     iqs9151_three_finger_reset(data);
     data->hold_button = 0U;
     iqs9151_reset_finger_history(data);
+}
+
+void iqs9151_test_cancel_pending_work(void *ctx) {
+    struct iqs9151_data *data = (struct iqs9151_data *)ctx;
+
+    (void)k_work_cancel_delayable(&data->inertia_scroll_work);
+    (void)k_work_cancel_delayable(&data->inertia_cursor_work);
+    (void)k_work_cancel(&data->work);
 }
 
 void iqs9151_test_process_frame(void *ctx,

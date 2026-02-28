@@ -73,7 +73,11 @@
     `elapsed<=ONE_FINGER_TAP_MAX_MS` かつ `abs(dx/dy)<=ONE_FINGER_TAP_MOVE`
   - 出力: `INPUT_BTN_0` click
 - 1F Hold:
-  - 条件: `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+  - hold候補:
+    - セッション開始時に `hold_candidate=true`
+    - `abs(dx)>ONE_FINGER_HOLD_MOVE` または `abs(dy)>ONE_FINGER_HOLD_MOVE` を
+      **一度でも超えたら** `hold_candidate=false`（同一接触中は復帰しない）
+  - 条件: `hold_candidate==true` かつ `elapsed>=IQS9151_HOLD_MIN_MS` かつ
     `abs(dx/dy)<=ONE_FINGER_HOLD_MOVE` かつ Tap未成立
   - 出力: `INPUT_BTN_0` press（ラッチ）
 
@@ -92,7 +96,13 @@
       `1->0` をTap成立として扱う
   - 出力: `INPUT_BTN_1` click
 - 2F Hold:
-  - 条件: `mode==NONE` かつ `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+  - hold候補:
+    - セッション開始時に `hold_candidate=true`
+    - `abs(centroid_dx/dy)>TWO_FINGER_HOLD_MOVE` または
+      `abs(distance_delta)>TWO_FINGER_HOLD_MOVE` を
+      **一度でも超えたら** `hold_candidate=false`（同一接触中は復帰しない）
+  - 条件: `mode==NONE` かつ `hold_candidate==true` かつ
+    `elapsed>=IQS9151_HOLD_MIN_MS` かつ
     `abs(centroid_dx/dy)<=TWO_FINGER_HOLD_MOVE` かつ
     `abs(distance_delta)<=TWO_FINGER_HOLD_MOVE` かつ Tap未成立
   - 出力: `INPUT_BTN_1` press（ラッチ）
@@ -123,7 +133,11 @@
       `THREE_FINGER_RELEASE_PENDING_MAX_MS` 以内の `->0` をTap成立として扱う
   - 出力: `INPUT_BTN_2` click
 - 3F Hold:
-  - 条件: `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+  - hold候補:
+    - セッション開始時に `three_hold_candidate=true`
+    - `abs(dx)>THREE_FINGER_HOLD_MOVE` または `abs(dy)>THREE_FINGER_HOLD_MOVE` を
+      **一度でも超えたら** `three_hold_candidate=false`（同一接触中は復帰しない）
+  - 条件: `three_hold_candidate==true` かつ `elapsed>=IQS9151_HOLD_MIN_MS` かつ
     `abs(dx/dy)<=THREE_FINGER_HOLD_MOVE` かつ Tap未成立
   - 出力: `INPUT_BTN_2` press（ラッチ）
 - 3F Swipe:
@@ -138,6 +152,7 @@
 ## 5. 優先度・排他
 
 - Tap/Hold競合は `tap_possible` 条件で排他し、Tap候補中はHoldを出さない。
+- Hold は move閾値超過で候補を失効し、同一接触中に再成立しない。
 - `hold_button` は単一ラッチ。
   別Tap/Hold成立時は先に既存holdをreleaseし、新イベントは同フレーム抑止する。
 - 遷移フレームでは、旧セッション終了処理と新セッション開始判定を同一フレームで扱う。
@@ -170,3 +185,5 @@
   - 3F `1->3` / `2->3` lead 許容を記載
   - 現在の閾値 (`SCROLL_START_MOVE=50`, `PINCH_START_DISTANCE=80`) に更新
   - 3F Swipe の1ショット実装を `three_swipe_sent` ラッチ方式に更新
+- 2026-02-28: HOLD候補の失効ルールを追記
+  - 1F/2F/3F Hold は、Hold移動閾値を一度でも超えた接触では再成立しない仕様に更新

@@ -79,6 +79,7 @@ static void iqs9151_work_cb_before(void *fixture_ptr) {
         (struct iqs9151_work_cb_fixture *)fixture_ptr;
 
     memset(&fixture->log, 0, sizeof(fixture->log));
+    iqs9151_test_cancel_pending_work(fixture->ctx);
     iqs9151_test_context_init(fixture->ctx, NULL);
     iqs9151_test_set_event_hook(record_event, &fixture->log);
 }
@@ -378,6 +379,31 @@ ZTEST_F(iqs9151_work_cb, test_one_finger_hold_prevents_cursor_inertia_start) {
                   "Hold button should stay latched until another hold/tap");
 }
 
+ZTEST_F(iqs9151_work_cb, test_one_finger_hold_stays_blocked_after_move_threshold_exceeded) {
+    const struct iqs9151_test_frame one_down =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
+    const struct iqs9151_test_frame one_move_far =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 140, 100, 0, 0);
+    const struct iqs9151_test_frame one_move_back =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
+    const struct iqs9151_test_frame one_hold_check =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &one_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &one_move_far, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &one_move_back, k_uptime_get());
+    k_msleep(220);
+    iqs9151_test_process_frame(fixture->ctx, &one_hold_check, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 0U,
+                  "1F hold must stay blocked after hold-move threshold is exceeded once");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should not latch after exceeded hold-move threshold");
+}
+
 ZTEST_F(iqs9151_work_cb, test_one_finger_tap_releases_latched_hold) {
     const struct iqs9151_test_frame tap_down =
         make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
@@ -398,6 +424,39 @@ ZTEST_F(iqs9151_work_cb, test_one_finger_tap_releases_latched_hold) {
                   "Hold button should be cleared by tap");
 }
 
+ZTEST_F(iqs9151_work_cb, test_two_finger_hold_stays_blocked_after_move_threshold_exceeded) {
+    const struct iqs9151_test_frame two_start =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame two_move_far =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 145, 100, 245, 100);
+    const struct iqs9151_test_frame two_move_back =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame two_hold_check =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &two_start, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &two_move_far, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &two_move_back, k_uptime_get());
+    k_msleep(220);
+    iqs9151_test_process_frame(fixture->ctx, &two_hold_check, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 0U,
+                  "2F hold must stay blocked after hold-move threshold is exceeded once");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should not latch after exceeded hold-move threshold");
+}
+
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_releases_latched_hold) {
     const struct iqs9151_test_frame three_start =
         make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
@@ -416,6 +475,31 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_tap_releases_latched_hold) {
     zassert_equal(fixture->log.events[0].value, 0, "Event[0] should be BTN2 release");
     zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
                   "Hold button should be cleared by 3F tap");
+}
+
+ZTEST_F(iqs9151_work_cb, test_three_finger_hold_stays_blocked_after_move_threshold_exceeded) {
+    const struct iqs9151_test_frame three_start =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame three_move_far =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 545, 500, 0, 0);
+    const struct iqs9151_test_frame three_move_back =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame three_hold_check =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &three_start, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &three_move_far, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &three_move_back, k_uptime_get());
+    k_msleep(220);
+    iqs9151_test_process_frame(fixture->ctx, &three_hold_check, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 0U,
+                  "3F hold must stay blocked after hold-move threshold is exceeded once");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should not latch after exceeded hold-move threshold");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_click_emits_btn2) {
