@@ -1239,7 +1239,8 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
             data->three_hold_candidate = false;
         }
 
-        if (!data->three_swipe_sent && !data->three_hold_sent) {
+        if (!data->three_swipe_sent && !data->three_hold_sent &&
+            IS_ENABLED(CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE)) {
             const bool tap_possible = data->three_tap_candidate &&
                                       elapsed <= THREE_FINGER_TAP_MAX_MS;
             if (data->three_hold_candidate &&

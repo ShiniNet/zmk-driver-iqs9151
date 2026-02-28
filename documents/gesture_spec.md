@@ -54,6 +54,7 @@
 - 3F:
   - `THREE_FINGER_TAP_MAX_MS = 180` (`CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS`)
   - `THREE_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_3F_TAP_MOVE`)
+  - `THREE_FINGER_PRESSHOLD_ENABLE` (`CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE`)
   - `THREE_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS`)
   - `THREE_FINGER_HOLD_MOVE = 40` (固定)
   - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150` (固定)
@@ -139,6 +140,7 @@
       `THREE_FINGER_RELEASE_PENDING_MAX_MS` 以内の `->0` をTap成立として扱う
   - 出力: `INPUT_BTN_2` click
 - 3F Hold:
+  - 有効条件: `CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=y`
   - hold候補:
     - セッション開始時に `three_hold_candidate=true`
     - `abs(dx)>THREE_FINGER_HOLD_MOVE` または `abs(dy)>THREE_FINGER_HOLD_MOVE` を
@@ -171,7 +173,8 @@
   - 2F Tap: `INPUT_BTN_1` (press + release)
   - 3F Tap: `INPUT_BTN_2` (press + release)
 - Hold:
-  - 1F/2F/3F Hold: `INPUT_BTN_0/1/2` press（別Tap/Holdでrelease）
+  - 1F/2F Hold: `INPUT_BTN_0/1` press（別Tap/Holdでrelease）
+  - 3F Hold: `INPUT_BTN_2` press（`CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=y` のとき）
 - Swipe:
   - 3F: `INPUT_BTN_3/4/5/6` click
 - Pinch:

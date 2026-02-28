@@ -184,7 +184,9 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_pinch_reports_btn7_and_wheel) {
 
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_REL, "Event[1] not rel");
     zassert_equal(fixture->log.events[1].code, INPUT_REL_WHEEL, "Event[1] unexpected code");
-    zassert_equal(fixture->log.events[1].value, 6, "Event[1] unexpected wheel value");
+    const int32_t expected_wheel =
+        (80 * CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10) / (12 * 10);
+    zassert_equal(fixture->log.events[1].value, expected_wheel, "Event[1] unexpected wheel value");
 
     zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
     zassert_equal(fixture->log.events[2].code, INPUT_BTN_7, "Event[2] unexpected code");
@@ -500,6 +502,30 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_hold_stays_blocked_after_move_thresho
                   "3F hold must stay blocked after hold-move threshold is exceeded once");
     zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
                   "Hold button should not latch after exceeded hold-move threshold");
+}
+
+ZTEST_F(iqs9151_work_cb, test_three_finger_hold_respects_presshold_config) {
+    const struct iqs9151_test_frame three_start =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame three_hold_check =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &three_start, k_uptime_get());
+    k_msleep(220);
+    iqs9151_test_process_frame(fixture->ctx, &three_hold_check, k_uptime_get());
+
+#if CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE
+    zassert_equal(fixture->log.count, 1U, "Expected 3F hold press when enabled");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "Hold button should latch when 3F hold is enabled");
+#else
+    zassert_equal(fixture->log.count, 0U, "3F hold must not emit when disabled");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should not latch when 3F hold is disabled");
+#endif
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_click_emits_btn2) {

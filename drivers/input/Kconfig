@@ -247,6 +247,12 @@ config INPUT_IQS9151_3F_TAP_MOVE
     help
       Maximum finger1 tracked movement for 3F tap detection (driver-side).
 
+config INPUT_IQS9151_3F_PRESSHOLD_ENABLE
+    bool "IQS9151 three-finger press/hold enable"
+    default y
+    help
+      Enable three-finger press/hold detection in the driver.
+
 config INPUT_IQS9151_3F_HOLD_MIN_MS
     int "IQS9151 three-finger hold minimum time (ms)"
     range 1 3000
