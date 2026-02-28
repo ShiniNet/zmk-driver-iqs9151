@@ -68,6 +68,8 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define TWO_FINGER_SCROLL_START_MOVE CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE
 #define TWO_FINGER_PINCH_START_DISTANCE CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE
 #define TWO_FINGER_PINCH_WHEEL_DIV 12
+#define TWO_FINGER_PINCH_WHEEL_GAIN_X10 CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10
+#define TWO_FINGER_PINCH_WHEEL_GAIN_DEN 10
 
 BUILD_ASSERT(CONFIG_INPUT_IQS9151_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS,
              "HOLD_MIN_MS must be >= 1F_TAP_MAX_MS");
@@ -1072,11 +1074,15 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
                 result->scroll_y = (int16_t)CLAMP(step_y, INT16_MIN, INT16_MAX);
             }
         } else if (state->mode == IQS9151_2F_MODE_PINCH) {
-            const int32_t wheel_acc = state->pinch_wheel_remainder + step_dist;
-            const int32_t wheel = wheel_acc / TWO_FINGER_PINCH_WHEEL_DIV;
+            const int32_t wheel_div =
+                TWO_FINGER_PINCH_WHEEL_DIV * TWO_FINGER_PINCH_WHEEL_GAIN_DEN;
+            const int32_t wheel_acc =
+                state->pinch_wheel_remainder +
+                (step_dist * TWO_FINGER_PINCH_WHEEL_GAIN_X10);
+            const int32_t wheel = wheel_acc / wheel_div;
 
             state->pinch_wheel_remainder =
-                wheel_acc - (wheel * TWO_FINGER_PINCH_WHEEL_DIV);
+                wheel_acc - (wheel * wheel_div);
             result->pinch_active = true;
             result->pinch_wheel = (int16_t)CLAMP(wheel, INT16_MIN, INT16_MAX);
         }

@@ -47,6 +47,7 @@
   - `TWO_FINGER_HOLD_MOVE = 40` (固定)
   - `TWO_FINGER_SCROLL_START_MOVE = 50` (`CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE`)
   - `TWO_FINGER_PINCH_START_DISTANCE = 80` (`CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE`)
+  - `TWO_FINGER_PINCH_WHEEL_GAIN_X10 = 40` (`CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10`)
   - `TWO_FINGER_RELEASE_PENDING_MAX_MS = 150` (固定)
   - `TWO_FINGER_ONE_LEAD_MAX_MS = 120` (固定)
 - 3F:
@@ -114,6 +115,9 @@
   - 開始: `mode==NONE` かつ
     `abs(distance_delta) >= TWO_FINGER_PINCH_START_DISTANCE` かつ
     `abs(distance_delta) > max(abs(centroid_dx), abs(centroid_dy))`
+  - `REL_WHEEL` は `step_dist` を基に
+    `wheel = (step_dist * TWO_FINGER_PINCH_WHEEL_GAIN_X10) / (12 * 10)` 相当で算出
+    （余りはフレーム間で保持）
   - 出力: `INPUT_BTN_7` press/release + `REL_WHEEL`
 - Scroll/Pinch競合:
   - 同時成立時は Scroll 優先で mode 固定

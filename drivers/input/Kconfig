@@ -212,6 +212,14 @@ config INPUT_IQS9151_2F_PINCH_START_DISTANCE
     help
       Distance-delta threshold to start 2F pinch mode (driver-side).
 
+config INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10
+    int "IQS9151 two-finger pinch wheel gain (x10)"
+    range 1 100
+    default 40
+    help
+      Gain for 2F pinch REL_WHEEL output inside the driver.
+      10 = 1.0x, 20 = 2.0x, 5 = 0.5x.
+
 config INPUT_IQS9151_3F_TAP_ENABLE
     bool "IQS9151 three-finger tap enable"
     default y
