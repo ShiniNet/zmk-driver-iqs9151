@@ -50,7 +50,9 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define CURSOR_EMA_ALPHA 30
 #define ONE_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS
 #define TWO_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS
-#define IQS9151_HOLD_MIN_MS CONFIG_INPUT_IQS9151_HOLD_MIN_MS
+#define ONE_FINGER_HOLD_MIN_MS CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS
+#define TWO_FINGER_HOLD_MIN_MS CONFIG_INPUT_IQS9151_2F_HOLD_MIN_MS
+#define THREE_FINGER_HOLD_MIN_MS CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS
 #define IQS9151_TAP_REENTRY_WINDOW_MS 30
 #define TWO_FINGER_RELEASE_PENDING_MAX_MS 150
 #define THREE_FINGER_RELEASE_PENDING_MAX_MS 150
@@ -71,12 +73,12 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define TWO_FINGER_PINCH_WHEEL_GAIN_X10 CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10
 #define TWO_FINGER_PINCH_WHEEL_GAIN_DEN 10
 
-BUILD_ASSERT(CONFIG_INPUT_IQS9151_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS,
-             "HOLD_MIN_MS must be >= 1F_TAP_MAX_MS");
-BUILD_ASSERT(CONFIG_INPUT_IQS9151_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS,
-             "HOLD_MIN_MS must be >= 2F_TAP_MAX_MS");
-BUILD_ASSERT(CONFIG_INPUT_IQS9151_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS,
-             "HOLD_MIN_MS must be >= 3F_TAP_MAX_MS");
+BUILD_ASSERT(CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS,
+             "1F_HOLD_MIN_MS must be >= 1F_TAP_MAX_MS");
+BUILD_ASSERT(CONFIG_INPUT_IQS9151_2F_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS,
+             "2F_HOLD_MIN_MS must be >= 2F_TAP_MAX_MS");
+BUILD_ASSERT(CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS,
+             "3F_HOLD_MIN_MS must be >= 3F_TAP_MAX_MS");
 
 struct iqs9151_config {
     struct i2c_dt_spec i2c;
@@ -913,7 +915,7 @@ static bool iqs9151_one_finger_update(struct iqs9151_data *data,
                                       elapsed_ms <= ONE_FINGER_TAP_MAX_MS;
             if (state->hold_candidate &&
                 !tap_possible &&
-                elapsed_ms >= IQS9151_HOLD_MIN_MS &&
+                elapsed_ms >= ONE_FINGER_HOLD_MIN_MS &&
                 iqs9151_abs32(state->dx) <= ONE_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(state->dy) <= ONE_FINGER_HOLD_MOVE) {
                 state->hold_sent = iqs9151_emit_hold_press(data, dev, INPUT_BTN_0);
@@ -1057,7 +1059,7 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
                                       elapsed_ms <= TWO_FINGER_TAP_MAX_MS;
             if (state->hold_candidate &&
                 !tap_possible &&
-                elapsed_ms >= IQS9151_HOLD_MIN_MS &&
+                elapsed_ms >= TWO_FINGER_HOLD_MIN_MS &&
                 iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(state->distance_delta) <= TWO_FINGER_HOLD_MOVE) {
@@ -1242,7 +1244,7 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
                                       elapsed <= THREE_FINGER_TAP_MAX_MS;
             if (data->three_hold_candidate &&
                 !tap_possible &&
-                elapsed >= IQS9151_HOLD_MIN_MS &&
+                elapsed >= THREE_FINGER_HOLD_MIN_MS &&
                 iqs9151_abs32(data->three_dx) <= THREE_FINGER_HOLD_MOVE &&
                 iqs9151_abs32(data->three_dy) <= THREE_FINGER_HOLD_MOVE) {
                 data->three_hold_sent = iqs9151_emit_hold_press(data, dev, INPUT_BTN_2);

@@ -121,12 +121,12 @@ config INPUT_IQS9151_1F_PRESSHOLD_ENABLE
     help
       Enable single-finger press/hold detection in the driver.
 
-config INPUT_IQS9151_HOLD_MIN_MS
-    int "IQS9151 hold minimum time (ms)"
+config INPUT_IQS9151_1F_HOLD_MIN_MS
+    int "IQS9151 single-finger hold minimum time (ms)"
     range 1 3000
     default 200
     help
-      Minimum down duration before hold is considered (driver-side).
+      Minimum down duration before 1F hold is considered (driver-side).
 
 config INPUT_IQS9151_CURSOR_INERTIA_ENABLE
     bool "IQS9151 cursor inertia enable"
@@ -166,6 +166,13 @@ config INPUT_IQS9151_2F_PRESSHOLD_ENABLE
     default y
     help
       Enable two-finger press/hold detection in the driver.
+
+config INPUT_IQS9151_2F_HOLD_MIN_MS
+    int "IQS9151 two-finger hold minimum time (ms)"
+    range 1 3000
+    default 200
+    help
+      Minimum down duration before 2F hold is considered (driver-side).
 
 config INPUT_IQS9151_SCROLL_Y_ENABLE
     bool "IQS9151 vertical scroll enable"
@@ -239,6 +246,13 @@ config INPUT_IQS9151_3F_TAP_MOVE
     default 30
     help
       Maximum finger1 tracked movement for 3F tap detection (driver-side).
+
+config INPUT_IQS9151_3F_HOLD_MIN_MS
+    int "IQS9151 three-finger hold minimum time (ms)"
+    range 1 3000
+    default 200
+    help
+      Minimum down duration before 3F hold is considered (driver-side).
 
 config INPUT_IQS9151_3F_SWIPE_THRESHOLD
     int "IQS9151 three-finger swipe threshold"

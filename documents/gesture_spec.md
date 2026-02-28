@@ -35,15 +35,16 @@
 ## 3. 判定パラメータ（既定値）
 
 - 共通:
-  - `IQS9151_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_HOLD_MIN_MS`)
   - `IQS9151_TAP_REENTRY_WINDOW_MS = 30` (固定)
 - 1F:
   - `ONE_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS`)
   - `ONE_FINGER_TAP_MOVE = 25` (`CONFIG_INPUT_IQS9151_1F_TAP_MOVE`)
+  - `ONE_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS`)
   - `ONE_FINGER_HOLD_MOVE = 30` (固定)
 - 2F:
   - `TWO_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS`)
   - `TWO_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_2F_TAP_MOVE`)
+  - `TWO_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_2F_HOLD_MIN_MS`)
   - `TWO_FINGER_HOLD_MOVE = 40` (固定)
   - `TWO_FINGER_SCROLL_START_MOVE = 50` (`CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE`)
   - `TWO_FINGER_PINCH_START_DISTANCE = 80` (`CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE`)
@@ -53,6 +54,7 @@
 - 3F:
   - `THREE_FINGER_TAP_MAX_MS = 180` (`CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS`)
   - `THREE_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_3F_TAP_MOVE`)
+  - `THREE_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS`)
   - `THREE_FINGER_HOLD_MOVE = 40` (固定)
   - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150` (固定)
   - `THREE_FINGER_ONE_LEAD_MAX_MS = 120` (固定)
@@ -78,7 +80,7 @@
     - セッション開始時に `hold_candidate=true`
     - `abs(dx)>ONE_FINGER_HOLD_MOVE` または `abs(dy)>ONE_FINGER_HOLD_MOVE` を
       **一度でも超えたら** `hold_candidate=false`（同一接触中は復帰しない）
-  - 条件: `hold_candidate==true` かつ `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+  - 条件: `hold_candidate==true` かつ `elapsed>=ONE_FINGER_HOLD_MIN_MS` かつ
     `abs(dx/dy)<=ONE_FINGER_HOLD_MOVE` かつ Tap未成立
   - 出力: `INPUT_BTN_0` press（ラッチ）
 
@@ -103,7 +105,7 @@
       `abs(distance_delta)>TWO_FINGER_HOLD_MOVE` を
       **一度でも超えたら** `hold_candidate=false`（同一接触中は復帰しない）
   - 条件: `mode==NONE` かつ `hold_candidate==true` かつ
-    `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+    `elapsed>=TWO_FINGER_HOLD_MIN_MS` かつ
     `abs(centroid_dx/dy)<=TWO_FINGER_HOLD_MOVE` かつ
     `abs(distance_delta)<=TWO_FINGER_HOLD_MOVE` かつ Tap未成立
   - 出力: `INPUT_BTN_1` press（ラッチ）
@@ -141,7 +143,7 @@
     - セッション開始時に `three_hold_candidate=true`
     - `abs(dx)>THREE_FINGER_HOLD_MOVE` または `abs(dy)>THREE_FINGER_HOLD_MOVE` を
       **一度でも超えたら** `three_hold_candidate=false`（同一接触中は復帰しない）
-  - 条件: `three_hold_candidate==true` かつ `elapsed>=IQS9151_HOLD_MIN_MS` かつ
+  - 条件: `three_hold_candidate==true` かつ `elapsed>=THREE_FINGER_HOLD_MIN_MS` かつ
     `abs(dx/dy)<=THREE_FINGER_HOLD_MOVE` かつ Tap未成立
   - 出力: `INPUT_BTN_2` press（ラッチ）
 - 3F Swipe:
