@@ -39,8 +39,10 @@
 - 1F:
   - `ONE_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS`)
   - `ONE_FINGER_TAP_MOVE = 25` (`CONFIG_INPUT_IQS9151_1F_TAP_MOVE`)
-  - `ONE_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS`)
+  - `ONE_FINGER_HOLD_MIN_MS = 90` (`CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS`)
   - `ONE_FINGER_HOLD_MOVE = 30` (固定)
+  - `ONE_FINGER_TAPDRAG_GAP_MAX_MS = 130`
+    (`CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS`)
 - 2F:
   - `TWO_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS`)
   - `TWO_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_2F_TAP_MOVE`)
@@ -76,14 +78,17 @@
   - 成立: `finger_count==0` かつ
     `elapsed<=ONE_FINGER_TAP_MAX_MS` かつ `abs(dx/dy)<=ONE_FINGER_TAP_MOVE`
   - 出力: `INPUT_BTN_0` click
-- 1F Hold:
+- 1F TapDrag Hold:
+  - 1回目タップ成立時に TapDrag をアーム
+  - 2回目タッチが `ONE_FINGER_TAPDRAG_GAP_MAX_MS` 以内なら hold候補開始
   - hold候補:
-    - セッション開始時に `hold_candidate=true`
+    - 2回目タッチ開始時に `hold_candidate=true`
     - `abs(dx)>ONE_FINGER_HOLD_MOVE` または `abs(dy)>ONE_FINGER_HOLD_MOVE` を
       **一度でも超えたら** `hold_candidate=false`（同一接触中は復帰しない）
   - 条件: `hold_candidate==true` かつ `elapsed>=ONE_FINGER_HOLD_MIN_MS` かつ
-    `abs(dx/dy)<=ONE_FINGER_HOLD_MOVE` かつ Tap未成立
-  - 出力: `INPUT_BTN_0` press（ラッチ）
+    `abs(dx/dy)<=ONE_FINGER_HOLD_MOVE`
+  - 出力: `INPUT_BTN_0` press（2回目タッチ中のみ保持）
+  - リリース: 2回目タッチが離れたフレームで即 `INPUT_BTN_0` release
 
 ### 4.2 2F
 
@@ -159,7 +164,7 @@
 
 ## 5. 優先度・排他
 
-- Tap/Hold競合は `tap_possible` 条件で排他し、Tap候補中はHoldを出さない。
+- 2F/3F の Tap/Hold競合は `tap_possible` 条件で排他し、Tap候補中はHoldを出さない。
 - Hold は move閾値超過で候補を失効し、同一接触中に再成立しない。
 - `hold_button` は単一ラッチ。
   別Tap/Hold成立時は先に既存holdをreleaseし、新イベントは同フレーム抑止する。
@@ -173,7 +178,8 @@
   - 2F Tap: `INPUT_BTN_1` (press + release)
   - 3F Tap: `INPUT_BTN_2` (press + release)
 - Hold:
-  - 1F/2F Hold: `INPUT_BTN_0/1` press（別Tap/Holdでrelease）
+  - 1F TapDrag Hold: `INPUT_BTN_0` press（2回目タッチのUPで即release）
+  - 2F Hold: `INPUT_BTN_1` press（別Tap/Holdでrelease）
   - 3F Hold: `INPUT_BTN_2` press（`CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=y` のとき）
 - Swipe:
   - 3F: `INPUT_BTN_3/4/5/6` click
@@ -196,3 +202,6 @@
   - 3F Swipe の1ショット実装を `three_swipe_sent` ラッチ方式に更新
 - 2026-02-28: HOLD候補の失効ルールを追記
   - 1F/2F/3F Hold は、Hold移動閾値を一度でも超えた接触では再成立しない仕様に更新
+- 2026-03-04: 1F Hold を TapDrag 方式へ変更
+  - 1回目短タップ後、`ONE_FINGER_TAPDRAG_GAP_MAX_MS` 以内の2回目タッチで Hold 判定
+  - 1F Hold のラッチ解除方式を廃止し、2回目タッチUPで即 release に更新

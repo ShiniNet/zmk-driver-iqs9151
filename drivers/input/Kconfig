@@ -119,14 +119,24 @@ config INPUT_IQS9151_1F_PRESSHOLD_ENABLE
     bool "IQS9151 single-finger press/hold enable"
     default y
     help
-      Enable single-finger press/hold detection in the driver.
+      Enable single-finger TapDrag press/hold detection in the driver.
+      Behavior: short tap -> second touch hold -> BTN0 press,
+      and finger-up releases BTN0 immediately.
 
 config INPUT_IQS9151_1F_HOLD_MIN_MS
     int "IQS9151 single-finger hold minimum time (ms)"
     range 1 3000
-    default 200
+    default 90
     help
-      Minimum down duration before 1F hold is considered (driver-side).
+      Minimum second-touch down duration before 1F TapDrag hold press
+      is emitted (driver-side).
+
+config INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS
+    int "IQS9151 single-finger TapDrag inter-tap gap max time (ms)"
+    range 1 1000
+    default 130
+    help
+      Maximum release-to-next-touch gap allowed for 1F TapDrag arming.
 
 config INPUT_IQS9151_CURSOR_INERTIA_ENABLE
     bool "IQS9151 cursor inertia enable"
