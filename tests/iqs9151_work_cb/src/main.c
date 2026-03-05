@@ -227,13 +227,21 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_tap_click_emits_btn1) {
     iqs9151_test_process_frame(fixture->ctx, &two_start, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN1 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN1 press on first 2F tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should remain pressed while waiting second 2F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN1 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN1 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN1 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_two_finger_tap_staggered_release_emits_btn1) {
@@ -250,13 +258,21 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_tap_staggered_release_emits_btn1) {
     iqs9151_test_process_frame(fixture->ctx, &one_release, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN1 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN1 press on first 2F tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should remain pressed while waiting second 2F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN1 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN1 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN1 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_two_finger_tap_one_lead_finger_emits_btn1) {
@@ -276,13 +292,21 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_tap_one_lead_finger_emits_btn1) {
     iqs9151_test_process_frame(fixture->ctx, &one_release, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN1 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN1 press on one-lead 2F tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should remain pressed while waiting second 2F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN1 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN1 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN1 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_two_finger_tap_moved_one_lead_does_not_click) {
@@ -327,13 +351,22 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_tap_jitter_no_pinch_emits_btn1) {
     iqs9151_test_process_frame(fixture->ctx, &one_release, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN1 click (press + release)");
+    zassert_equal(fixture->log.count, 1U,
+                  "Expected deferred BTN1 press for jittered 2F tap without pinch");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should remain pressed while waiting second 2F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN1 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN1 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN1 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_two_finger_tap_releases_latched_hold) {
@@ -358,14 +391,37 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_tap_releases_latched_hold) {
                   "Hold button should be cleared by 2F tap");
 }
 
-ZTEST_F(iqs9151_work_cb, test_one_finger_tapdrag_presses_on_second_touch_and_releases_on_finger_up) {
+ZTEST_F(iqs9151_work_cb, test_one_finger_tap_defers_release_until_timeout) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    zassert_equal(fixture->log.count, 1U, "Expected deferred press on first tap");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_0, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN0 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_0,
+                  "BTN0 should remain pressed while waiting second touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_0, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN0 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred press should be released on timeout");
+}
+
+ZTEST_F(iqs9151_work_cb, test_one_finger_double_tap_emits_release_then_click) {
     const struct iqs9151_test_frame first_tap_down =
         make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
     const struct iqs9151_test_frame first_tap_up =
         make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
     const struct iqs9151_test_frame second_touch_down =
-        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 101, 100, 0, 0);
-    const struct iqs9151_test_frame second_touch_hold_check =
         make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 101, 100, 0, 0);
     const struct iqs9151_test_frame second_touch_up =
         make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
@@ -374,31 +430,28 @@ ZTEST_F(iqs9151_work_cb, test_one_finger_tapdrag_presses_on_second_touch_and_rel
     iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
     k_msleep(60);
     iqs9151_test_process_frame(fixture->ctx, &second_touch_down, k_uptime_get());
-    k_msleep(120);
-    iqs9151_test_process_frame(fixture->ctx, &second_touch_hold_check, k_uptime_get());
+    k_msleep(70);
     iqs9151_test_process_frame(fixture->ctx, &second_touch_up, k_uptime_get());
 
     zassert_equal(fixture->log.count, 4U,
-                  "Expected tap click + TapDrag hold press/release");
+                  "Expected deferred press release + second click on double-tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_0, "Event[0] unexpected code");
-    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN0 press");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN0 deferred press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_0, "Event[1] unexpected code");
-    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN0 release");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should release first click");
     zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
     zassert_equal(fixture->log.events[2].code, INPUT_BTN_0, "Event[2] unexpected code");
-    zassert_equal(fixture->log.events[2].value, 1, "Event[2] should be BTN0 press");
+    zassert_equal(fixture->log.events[2].value, 1, "Event[2] should be second click press");
     zassert_equal(fixture->log.events[3].type, IQS9151_TEST_EVENT_KEY, "Event[3] not key");
     zassert_equal(fixture->log.events[3].code, INPUT_BTN_0, "Event[3] unexpected code");
-    zassert_equal(fixture->log.events[3].value, 0, "Event[3] should be BTN0 release");
-    zassert_false(iqs9151_test_cursor_inertia_active(fixture->ctx),
-                  "Cursor inertia must not start after TapDrag release");
+    zassert_equal(fixture->log.events[3].value, 0, "Event[3] should be second click release");
     zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
-                  "TapDrag hold should be released on finger-up");
+                  "Hold button should be cleared after double-tap");
 }
 
-ZTEST_F(iqs9151_work_cb, test_one_finger_tapdrag_stays_blocked_after_move_threshold_exceeded) {
+ZTEST_F(iqs9151_work_cb, test_one_finger_second_touch_drag_releases_on_finger_up) {
     const struct iqs9151_test_frame first_tap_down =
         make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
     const struct iqs9151_test_frame first_tap_up =
@@ -407,10 +460,6 @@ ZTEST_F(iqs9151_work_cb, test_one_finger_tapdrag_stays_blocked_after_move_thresh
         make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
     const struct iqs9151_test_frame second_touch_move_far =
         make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 140, 100, 0, 0);
-    const struct iqs9151_test_frame second_touch_move_back =
-        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
-    const struct iqs9151_test_frame second_touch_hold_check =
-        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 100, 100, 0, 0);
     const struct iqs9151_test_frame second_touch_up =
         make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
 
@@ -419,21 +468,20 @@ ZTEST_F(iqs9151_work_cb, test_one_finger_tapdrag_stays_blocked_after_move_thresh
     k_msleep(60);
     iqs9151_test_process_frame(fixture->ctx, &second_touch_down, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &second_touch_move_far, k_uptime_get());
-    iqs9151_test_process_frame(fixture->ctx, &second_touch_move_back, k_uptime_get());
-    k_msleep(120);
-    iqs9151_test_process_frame(fixture->ctx, &second_touch_hold_check, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &second_touch_up, k_uptime_get());
 
     zassert_equal(fixture->log.count, 2U,
-                  "TapDrag hold must stay blocked once hold-move threshold is exceeded");
+                  "Expected press on first tap and release on second-touch finger-up");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_0, "Event[0] unexpected code");
-    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN0 tap press");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN0 deferred press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_0, "Event[1] unexpected code");
-    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN0 tap release");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN0 release");
+    zassert_false(iqs9151_test_cursor_inertia_active(fixture->ctx),
+                  "Cursor inertia must not start after drag release");
     zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
-                  "Hold button should not latch after exceeded TapDrag hold-move threshold");
+                  "Hold button should be cleared after drag release");
 }
 
 ZTEST_F(iqs9151_work_cb, test_one_finger_long_press_without_tapdrag_arm_does_not_emit_hold) {
@@ -475,37 +523,188 @@ ZTEST_F(iqs9151_work_cb, test_one_finger_tap_releases_latched_hold) {
                   "Hold button should be cleared by tap");
 }
 
-ZTEST_F(iqs9151_work_cb, test_two_finger_hold_stays_blocked_after_move_threshold_exceeded) {
-    const struct iqs9151_test_frame two_start =
+ZTEST_F(iqs9151_work_cb, test_two_finger_double_tap_emits_release_then_click) {
+    const struct iqs9151_test_frame first_tap_down =
         make_frame(2U,
                    IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
                    0, 0, 0, 100, 100, 200, 100);
-    const struct iqs9151_test_frame two_move_far =
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_tap_down =
         make_frame(2U,
                    IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
-                   0, 0, 0, 145, 100, 245, 100);
-    const struct iqs9151_test_frame two_move_back =
-        make_frame(2U,
-                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
-                   0, 0, 0, 100, 100, 200, 100);
-    const struct iqs9151_test_frame two_hold_check =
-        make_frame(2U,
-                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
-                   0, 0, 0, 100, 100, 200, 100);
-    const struct iqs9151_test_frame release =
+                   0, 0, 0, 102, 100, 202, 100);
+    const struct iqs9151_test_frame second_tap_up =
         make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
 
-    iqs9151_test_process_frame(fixture->ctx, &two_start, k_uptime_get());
-    iqs9151_test_process_frame(fixture->ctx, &two_move_far, k_uptime_get());
-    iqs9151_test_process_frame(fixture->ctx, &two_move_back, k_uptime_get());
-    k_msleep(220);
-    iqs9151_test_process_frame(fixture->ctx, &two_hold_check, k_uptime_get());
-    iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_tap_up, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 0U,
-                  "2F hold must stay blocked after hold-move threshold is exceeded once");
+    zassert_equal(fixture->log.count, 4U,
+                  "Expected deferred press release + second click on 2F double-tap");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should release first click");
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
+    zassert_equal(fixture->log.events[2].code, INPUT_BTN_1, "Event[2] unexpected code");
+    zassert_equal(fixture->log.events[2].value, 1, "Event[2] should be second click press");
+    zassert_equal(fixture->log.events[3].type, IQS9151_TEST_EVENT_KEY, "Event[3] not key");
+    zassert_equal(fixture->log.events[3].code, INPUT_BTN_1, "Event[3] unexpected code");
+    zassert_equal(fixture->log.events[3].value, 0, "Event[3] should be second click release");
     zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
-                  "Hold button should not latch after exceeded hold-move threshold");
+                  "Hold button should be cleared after 2F double-tap");
+}
+
+ZTEST_F(iqs9151_work_cb, test_two_finger_double_tap_one_lead_second_touch_emits_release_then_click) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_one_lead_down =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 102, 100, 0, 0);
+    const struct iqs9151_test_frame second_tap_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 102, 100, 202, 100);
+    const struct iqs9151_test_frame second_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN1 press after first 2F tap");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should remain pressed while waiting for second 2F touch");
+
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_one_lead_down, k_uptime_get());
+    zassert_equal(fixture->log.count, 1U,
+                  "Second-touch one-lead should not cancel pending 2F deferred click");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should stay pressed during second-touch one-lead");
+
+    k_msleep(12);
+    iqs9151_test_process_frame(fixture->ctx, &second_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_tap_up, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 4U,
+                  "Expected deferred press release + second click on one-lead 2F double-tap");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should release first click");
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
+    zassert_equal(fixture->log.events[2].code, INPUT_BTN_1, "Event[2] unexpected code");
+    zassert_equal(fixture->log.events[2].value, 1, "Event[2] should be second click press");
+    zassert_equal(fixture->log.events[3].type, IQS9151_TEST_EVENT_KEY, "Event[3] not key");
+    zassert_equal(fixture->log.events[3].code, INPUT_BTN_1, "Event[3] unexpected code");
+    zassert_equal(fixture->log.events[3].value, 0, "Event[3] should be second click release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should be cleared after 2F double-tap");
+}
+
+ZTEST_F(iqs9151_work_cb, test_two_finger_second_touch_drag_releases_on_finger_up) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_touch_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame second_touch_move_far =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 150, 100, 250, 100);
+    const struct iqs9151_test_frame one_drag_continue =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 150, 100, 0, 0);
+    const struct iqs9151_test_frame second_touch_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_move_far, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &one_drag_continue, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should stay pressed while second-touch drag continues");
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_up, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 2U,
+                  "Expected press on first 2F tap and release on second-touch finger-up");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN1 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should be cleared after second-touch drag release");
+}
+
+ZTEST_F(iqs9151_work_cb, test_two_finger_second_touch_drag_one_lead_keeps_hold_until_finger_up) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_one_lead_down =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 101, 100, 0, 0);
+    const struct iqs9151_test_frame second_touch_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 101, 100, 201, 100);
+    const struct iqs9151_test_frame second_touch_move_far =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 150, 100, 250, 100);
+    const struct iqs9151_test_frame one_drag_continue =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 150, 100, 0, 0);
+    const struct iqs9151_test_frame second_touch_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN1 press on first 2F tap");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should remain pressed while waiting second 2F touch");
+
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_one_lead_down, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should stay pressed during second-touch one-lead");
+
+    k_msleep(12);
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_move_far, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &one_drag_continue, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should stay pressed while one-lead second-touch drag continues");
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_up, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 2U,
+                  "Expected press on first 2F tap and release on one-lead second-touch drag end");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_1, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN1 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should be cleared after second-touch drag release");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_releases_latched_hold) {
@@ -528,53 +727,128 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_tap_releases_latched_hold) {
                   "Hold button should be cleared by 3F tap");
 }
 
-ZTEST_F(iqs9151_work_cb, test_three_finger_hold_stays_blocked_after_move_threshold_exceeded) {
-    const struct iqs9151_test_frame three_start =
+ZTEST_F(iqs9151_work_cb, test_three_finger_double_tap_emits_release_then_click) {
+    const struct iqs9151_test_frame first_tap_down =
         make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
-    const struct iqs9151_test_frame three_move_far =
-        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 545, 500, 0, 0);
-    const struct iqs9151_test_frame three_move_back =
-        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
-    const struct iqs9151_test_frame three_hold_check =
-        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
-    const struct iqs9151_test_frame release =
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_tap_down =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 502, 500, 0, 0);
+    const struct iqs9151_test_frame second_tap_up =
         make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
 
-    iqs9151_test_process_frame(fixture->ctx, &three_start, k_uptime_get());
-    iqs9151_test_process_frame(fixture->ctx, &three_move_far, k_uptime_get());
-    iqs9151_test_process_frame(fixture->ctx, &three_move_back, k_uptime_get());
-    k_msleep(220);
-    iqs9151_test_process_frame(fixture->ctx, &three_hold_check, k_uptime_get());
-    iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_tap_up, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 0U,
-                  "3F hold must stay blocked after hold-move threshold is exceeded once");
-    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
-                  "Hold button should not latch after exceeded hold-move threshold");
-}
-
-ZTEST_F(iqs9151_work_cb, test_three_finger_hold_respects_presshold_config) {
-    const struct iqs9151_test_frame three_start =
-        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
-    const struct iqs9151_test_frame three_hold_check =
-        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
-
-    iqs9151_test_process_frame(fixture->ctx, &three_start, k_uptime_get());
-    k_msleep(220);
-    iqs9151_test_process_frame(fixture->ctx, &three_hold_check, k_uptime_get());
-
-#if CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE
-    zassert_equal(fixture->log.count, 1U, "Expected 3F hold press when enabled");
+    zassert_equal(fixture->log.count, 4U,
+                  "Expected deferred press release + second click on 3F double-tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
-    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 press");
-    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
-                  "Hold button should latch when 3F hold is enabled");
-#else
-    zassert_equal(fixture->log.count, 0U, "3F hold must not emit when disabled");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should release first click");
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
+    zassert_equal(fixture->log.events[2].code, INPUT_BTN_2, "Event[2] unexpected code");
+    zassert_equal(fixture->log.events[2].value, 1, "Event[2] should be second click press");
+    zassert_equal(fixture->log.events[3].type, IQS9151_TEST_EVENT_KEY, "Event[3] not key");
+    zassert_equal(fixture->log.events[3].code, INPUT_BTN_2, "Event[3] unexpected code");
+    zassert_equal(fixture->log.events[3].value, 0, "Event[3] should be second click release");
     zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
-                  "Hold button should not latch when 3F hold is disabled");
-#endif
+                  "Hold button should be cleared after 3F double-tap");
+}
+
+ZTEST_F(iqs9151_work_cb, test_three_finger_second_touch_drag_releases_on_finger_up) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_touch_down =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame second_touch_move_far =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 560, 500, 0, 0);
+    const struct iqs9151_test_frame second_touch_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_move_far, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should stay pressed while second-touch drag continues");
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_up, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 2U,
+                  "Expected press on first 3F tap and release on second-touch finger-up");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should be cleared after second-touch drag release");
+}
+
+ZTEST_F(iqs9151_work_cb, test_three_finger_second_touch_drag_staged_entry_keeps_hold_until_finger_up) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_one_down =
+        make_frame(1U, IQS9151_TP_FINGER1_CONFIDENCE | 1U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame second_two_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 500, 500, 620, 500);
+    const struct iqs9151_test_frame second_three_down =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 620, 500);
+    const struct iqs9151_test_frame second_three_move_far =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 560, 500, 620, 500);
+    const struct iqs9151_test_frame second_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN2 press on first 3F tap");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should remain pressed while waiting second 3F touch");
+
+    k_msleep(60);
+
+    iqs9151_test_process_frame(fixture->ctx, &second_one_down, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should stay pressed during staged second-touch 1F entry");
+    zassert_equal(fixture->log.count, 1U,
+                  "No extra events should be emitted during staged second-touch 1F entry");
+
+    iqs9151_test_process_frame(fixture->ctx, &second_two_down, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should stay pressed during staged second-touch 2F entry");
+    zassert_equal(fixture->log.count, 1U,
+                  "No extra events should be emitted during staged second-touch 2F entry");
+
+    iqs9151_test_process_frame(fixture->ctx, &second_three_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_three_move_far, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should stay pressed while staged second-touch drag continues");
+
+    iqs9151_test_process_frame(fixture->ctx, &second_up, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 2U,
+                  "Expected press on first 3F tap and release on staged second-touch finger-up");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
+    zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should be cleared after staged second-touch drag release");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_click_emits_btn2) {
@@ -586,13 +860,21 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_tap_click_emits_btn2) {
     iqs9151_test_process_frame(fixture->ctx, &three_start, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN2 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN2 press on first 3F tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should remain pressed while waiting second 3F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN2 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN2 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_staggered_release_emits_btn2) {
@@ -612,13 +894,21 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_tap_staggered_release_emits_btn2) {
     iqs9151_test_process_frame(fixture->ctx, &one_release, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN2 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN2 press on first 3F tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should remain pressed while waiting second 3F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN2 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN2 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_one_lead_finger_emits_btn2) {
@@ -636,13 +926,21 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_tap_one_lead_finger_emits_btn2) {
     iqs9151_test_process_frame(fixture->ctx, &one_release, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN2 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN2 press on one-lead 3F tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should remain pressed while waiting second 3F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN2 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN2 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_moved_one_lead_does_not_click) {
@@ -688,13 +986,21 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_tap_two_lead_fingers_emits_btn2) {
     iqs9151_test_process_frame(fixture->ctx, &one_release, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN2 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN2 press on two-lead 3F tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should remain pressed while waiting second 3F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN2 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN2 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_moved_two_lead_does_not_click) {
@@ -741,13 +1047,21 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_tap_step_to_two_then_zero_avoids_btn1
     iqs9151_test_process_frame(fixture->ctx, &two_release, k_uptime_get());
     iqs9151_test_process_frame(fixture->ctx, &release, k_uptime_get());
 
-    zassert_equal(fixture->log.count, 2U, "Expected BTN2 click (press + release)");
+    zassert_equal(fixture->log.count, 1U, "Expected deferred BTN2 press on 3->2->0 tap");
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
     zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
     zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 press");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should remain pressed while waiting second 3F touch");
+
+    k_msleep(CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS + 30);
+
+    zassert_equal(fixture->log.count, 2U, "Expected timeout release after deferred BTN2 press");
     zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_KEY, "Event[1] not key");
     zassert_equal(fixture->log.events[1].code, INPUT_BTN_2, "Event[1] unexpected code");
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Deferred BTN2 press should be released on timeout");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_swipe_right_emits_btn3_click) {
