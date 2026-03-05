@@ -33,7 +33,7 @@
   - `THREE_FINGER_*_LEAD_MAX_MS = 120`
   - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150`
 
-## ケース一覧（34件）
+## ケース一覧（36件）
 
 |No.|テスト名|主な確認点|
 | - | - | - |
@@ -71,8 +71,10 @@
 |32|`test_three_finger_swipe_right_emits_btn3_click`|3F右スワイプで BTN3 click|
 |33|`test_three_finger_swipe_continuous_touch_emits_once`|3F連続接触中のスワイプが1ショットのみ|
 |34|`test_three_finger_swipe_left_continuous_touch_emits_once`|3F左スワイプでも連続接触中は1ショットのみ|
+|35|`test_two_finger_second_touch_drag_two_to_one_reports_cursor_motion`|2F TapDragの `2->1` 遷移中も BTN1保持しつつ `REL_X/Y` を出力|
+|36|`test_three_finger_second_touch_drag_three_to_one_reports_cursor_motion`|3F TapDragの `3->1` 遷移中も BTN2保持しつつ `REL_X/Y` を出力|
 
-注: テスト総数は `34` 件です（2026-03-06 時点）。
+注: テスト総数は `36` 件です（2026-03-06 時点）。
 
 ## 補足
 

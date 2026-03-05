@@ -126,6 +126,7 @@
       （ダブルクリック相当）
   - 2回目Touch継続:
     - 上記Tap条件を外れた場合は Drag扱いとして `INPUT_BTN_1` press を維持
+    - Drag中に `2->1` へ遷移した場合も hold は維持し、1F相対移動は `REL_X/Y` として送出
     - 全指離し (`finger_count==0`) で `INPUT_BTN_1` release
 - 2F Scroll:
   - 開始: `mode==NONE` かつ
@@ -169,6 +170,7 @@
       （ダブルクリック相当）
   - 2回目Touch継続:
     - 上記Tap条件を外れた場合は Drag扱いとして `INPUT_BTN_2` press を維持
+    - Drag中に `3->1` へ遷移した場合も hold は維持し、1F相対移動は `REL_X/Y` として送出
     - 全指離し (`finger_count==0`) で `INPUT_BTN_2` release
 - 3F Swipe:
   - 1回目3F接触中のみ判定（2回目監視中は無効）
@@ -211,6 +213,7 @@
   - `INPUT_BTN_7` press/release + `REL_WHEEL`
 - Relative:
   - 1Fで `REL_X/Y`
+  - 2F/3F TapDrag中でも `finger_count==1` なら `REL_X/Y` を送出（holdは維持）
   - 2F Scroll/Pinchで `REL_WHEEL/HWHEEL`
 
 ## 7. 改訂履歴
@@ -243,3 +246,5 @@
 - 2026-03-06: `*_HOLD_MIN_MS` 設定と到達不能 Hold 判定を削除
   - `drivers/input/Kconfig` から `1F/2F/3F_HOLD_MIN_MS` を削除
   - 2F/3F の到達不能 Hold 判定ブロックを `iqs9151.c` から削除
+- 2026-03-06: 2F/3F TapDrag中の `2->1` / `3->1` を仕様として明記
+  - hold (`BTN1/BTN2`) 維持中でも 1F `REL_X/Y` を送出する挙動を追加記載

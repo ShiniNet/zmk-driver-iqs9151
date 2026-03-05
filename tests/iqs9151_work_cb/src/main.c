@@ -707,6 +707,56 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_second_touch_drag_one_lead_keeps_hold_u
                   "Hold button should be cleared after second-touch drag release");
 }
 
+ZTEST_F(iqs9151_work_cb, test_two_finger_second_touch_drag_two_to_one_reports_cursor_motion) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_touch_down =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame second_touch_move_far =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 150, 100, 250, 100);
+    const struct iqs9151_test_frame one_drag_move =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   13, -8, 0, 190, 120, 0, 0);
+    const struct iqs9151_test_frame second_touch_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_move_far, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &one_drag_move, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_1,
+                  "BTN1 should stay pressed after 2F->1F transition during TapDrag");
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_up, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 4U,
+                  "Expected BTN1 press, cursor REL_X/Y on 2->1, and BTN1 release");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_1, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN1 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_REL, "Event[1] not rel");
+    zassert_equal(fixture->log.events[1].code, INPUT_REL_X, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, 13, "Event[1] should report cursor delta X");
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_REL, "Event[2] not rel");
+    zassert_equal(fixture->log.events[2].code, INPUT_REL_Y, "Event[2] unexpected code");
+    zassert_equal(fixture->log.events[2].value, -8, "Event[2] should report cursor delta Y");
+    zassert_equal(fixture->log.events[3].type, IQS9151_TEST_EVENT_KEY, "Event[3] not key");
+    zassert_equal(fixture->log.events[3].code, INPUT_BTN_1, "Event[3] unexpected code");
+    zassert_equal(fixture->log.events[3].value, 0, "Event[3] should be BTN1 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should be cleared after second-touch drag release");
+}
+
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_releases_latched_hold) {
     const struct iqs9151_test_frame three_start =
         make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
@@ -849,6 +899,50 @@ ZTEST_F(iqs9151_work_cb, test_three_finger_second_touch_drag_staged_entry_keeps_
     zassert_equal(fixture->log.events[1].value, 0, "Event[1] should be BTN2 release");
     zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
                   "Hold button should be cleared after staged second-touch drag release");
+}
+
+ZTEST_F(iqs9151_work_cb, test_three_finger_second_touch_drag_three_to_one_reports_cursor_motion) {
+    const struct iqs9151_test_frame first_tap_down =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame first_tap_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame second_touch_down =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 500, 500, 0, 0);
+    const struct iqs9151_test_frame second_touch_move_far =
+        make_frame(3U, IQS9151_TP_FINGER1_CONFIDENCE | 3U, 0, 0, 0, 560, 500, 0, 0);
+    const struct iqs9151_test_frame one_drag_move =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   -9, 15, 0, 610, 520, 0, 0);
+    const struct iqs9151_test_frame second_touch_up =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &first_tap_up, k_uptime_get());
+    k_msleep(60);
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_down, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_move_far, k_uptime_get());
+    iqs9151_test_process_frame(fixture->ctx, &one_drag_move, k_uptime_get());
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), INPUT_BTN_2,
+                  "BTN2 should stay pressed after 3F->1F transition during TapDrag");
+    iqs9151_test_process_frame(fixture->ctx, &second_touch_up, k_uptime_get());
+
+    zassert_equal(fixture->log.count, 4U,
+                  "Expected BTN2 press, cursor REL_X/Y on 3->1, and BTN2 release");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_2, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN2 deferred press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_REL, "Event[1] not rel");
+    zassert_equal(fixture->log.events[1].code, INPUT_REL_X, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value, -9, "Event[1] should report cursor delta X");
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_REL, "Event[2] not rel");
+    zassert_equal(fixture->log.events[2].code, INPUT_REL_Y, "Event[2] unexpected code");
+    zassert_equal(fixture->log.events[2].value, 15, "Event[2] should report cursor delta Y");
+    zassert_equal(fixture->log.events[3].type, IQS9151_TEST_EVENT_KEY, "Event[3] not key");
+    zassert_equal(fixture->log.events[3].code, INPUT_BTN_2, "Event[3] unexpected code");
+    zassert_equal(fixture->log.events[3].value, 0, "Event[3] should be BTN2 release");
+    zassert_equal(iqs9151_test_hold_button(fixture->ctx), 0U,
+                  "Hold button should be cleared after second-touch drag release");
 }
 
 ZTEST_F(iqs9151_work_cb, test_three_finger_tap_click_emits_btn2) {
