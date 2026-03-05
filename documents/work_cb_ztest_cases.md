@@ -33,7 +33,7 @@
   - `THREE_FINGER_*_LEAD_MAX_MS = 120`
   - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150`
 
-## ケース一覧（33件）
+## ケース一覧（34件）
 
 |No.|テスト名|主な確認点|
 | - | - | - |
@@ -60,18 +60,19 @@
 |21|`test_three_finger_tap_releases_latched_hold`|3Fタップ時に既存 hold を解放|
 |22|`test_three_finger_double_tap_emits_release_then_click`|3Fダブルタップで「1回目release + 2回目click」を出力|
 |23|`test_three_finger_second_touch_drag_releases_on_finger_up`|3Fの2回目タッチ継続時はBTN2を保持し、全指UPでrelease|
-|24|`test_three_finger_tap_click_emits_btn2`|3Fタップで deferred press後にtimeout release|
-|25|`test_three_finger_tap_staggered_release_emits_btn2`|`3->2->1->0` の3Fタップでも deferred press後にtimeout release|
-|26|`test_three_finger_tap_one_lead_finger_emits_btn2`|`1->3` one-lead で deferred press後にtimeout release|
-|27|`test_three_finger_tap_moved_one_lead_does_not_click`|移動済み one-lead は3Fタップ不成立|
-|28|`test_three_finger_tap_two_lead_fingers_emits_btn2`|`2->3` two-lead で deferred press後にtimeout release|
-|29|`test_three_finger_tap_moved_two_lead_does_not_click`|移動済み two-lead は3Fタップ不成立|
-|30|`test_three_finger_tap_step_to_two_then_zero_avoids_btn1`|`3->2->0` で BTN2成立し BTN1誤発火なし|
-|31|`test_three_finger_swipe_right_emits_btn3_click`|3F右スワイプで BTN3 click|
-|32|`test_three_finger_swipe_continuous_touch_emits_once`|3F連続接触中のスワイプが1ショットのみ|
-|33|`test_three_finger_swipe_left_continuous_touch_emits_once`|3F左スワイプでも連続接触中は1ショットのみ|
+|24|`test_three_finger_second_touch_drag_staged_entry_keeps_hold_until_finger_up`|3F TapDragの2回目 `0->2->3` two-lead でも保持継続し、全指UPでrelease|
+|25|`test_three_finger_tap_click_emits_btn2`|3Fタップで deferred press後にtimeout release|
+|26|`test_three_finger_tap_staggered_release_emits_btn2`|`3->2->1->0` の3Fタップでも deferred press後にtimeout release|
+|27|`test_three_finger_tap_one_lead_finger_emits_btn2`|`1->3` one-lead で deferred press後にtimeout release|
+|28|`test_three_finger_tap_moved_one_lead_does_not_click`|移動済み one-lead は3Fタップ不成立|
+|29|`test_three_finger_tap_two_lead_fingers_emits_btn2`|`2->3` two-lead で deferred press後にtimeout release|
+|30|`test_three_finger_tap_moved_two_lead_does_not_click`|移動済み two-lead は3Fタップ不成立|
+|31|`test_three_finger_tap_step_to_two_then_zero_avoids_btn1`|`3->2->0` で BTN2成立し BTN1誤発火なし|
+|32|`test_three_finger_swipe_right_emits_btn3_click`|3F右スワイプで BTN3 click|
+|33|`test_three_finger_swipe_continuous_touch_emits_once`|3F連続接触中のスワイプが1ショットのみ|
+|34|`test_three_finger_swipe_left_continuous_touch_emits_once`|3F左スワイプでも連続接触中は1ショットのみ|
 
-注: テスト総数は `33` 件です（2026-03-05 時点）。
+注: テスト総数は `34` 件です（2026-03-06 時点）。
 
 ## 補足
 
@@ -83,7 +84,6 @@
   前ケース由来の `k_work_delayable` をキャンセルして順序依存を防止する。
 - 1Fは deferred-click 方式: 1回目TapでBTN0 press保持、2回目Touch判定またはtimeoutでrelease。
 - 2F/3Fも deferred-click 方式: 1回目TapでBTN1/BTN2 press保持、2回目Touch判定またはtimeoutでrelease。
-- 2F/3F の `*_HOLD_MIN_MS` は互換項目で、現行判定では未使用。
 
 ## 実行コマンド
 

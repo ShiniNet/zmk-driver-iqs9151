@@ -123,14 +123,6 @@ config INPUT_IQS9151_1F_PRESSHOLD_ENABLE
       Behavior: first tap presses BTN0 immediately and keeps it pressed
       while waiting for a second touch.
 
-config INPUT_IQS9151_1F_HOLD_MIN_MS
-    int "IQS9151 single-finger hold minimum time (ms)"
-    range 1 3000
-    default 90
-    help
-      Compatibility parameter kept for legacy 1F TapDrag behavior.
-      Not used by the current deferred-click 1F implementation.
-
 config INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS
     int "IQS9151 single-finger deferred-click second-touch max time (ms)"
     range 1 1000
@@ -179,14 +171,6 @@ config INPUT_IQS9151_2F_PRESSHOLD_ENABLE
       Enable two-finger deferred-click/drag behavior in the driver.
       Behavior: first 2F tap presses BTN1 immediately and keeps it pressed
       while waiting for a second 2F touch.
-
-config INPUT_IQS9151_2F_HOLD_MIN_MS
-    int "IQS9151 two-finger hold minimum time (ms)"
-    range 1 3000
-    default 200
-    help
-      Compatibility parameter kept for legacy 2F hold behavior.
-      Not used by the current deferred-click 2F implementation.
 
 config INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS
     int "IQS9151 two-finger deferred-click second-touch max time (ms)"
@@ -276,14 +260,6 @@ config INPUT_IQS9151_3F_PRESSHOLD_ENABLE
       Enable three-finger deferred-click/drag behavior in the driver.
       Behavior: first 3F tap presses BTN2 immediately and keeps it pressed
       while waiting for a second 3F touch.
-
-config INPUT_IQS9151_3F_HOLD_MIN_MS
-    int "IQS9151 three-finger hold minimum time (ms)"
-    range 1 3000
-    default 200
-    help
-      Compatibility parameter kept for legacy 3F hold behavior.
-      Not used by the current deferred-click 3F implementation.
 
 config INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS
     int "IQS9151 three-finger deferred-click second-touch max time (ms)"

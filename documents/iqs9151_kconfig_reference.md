@@ -40,13 +40,11 @@
 |`CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS`|int|`120`|1F Tap/2回目Tap 判定の最大時間|
 |`CONFIG_INPUT_IQS9151_1F_TAP_MOVE`|int|`25`|1F Tap 移動しきい値|
 |`CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE`|bool|`y`|1F deferred-click/drag 有効/無効|
-|`CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS`|int|`90`|互換項目（現行1F仕様では未使用）|
 |`CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS`|int|`230`|1F Tap後にBTN0を保持して2回目タッチを待つ最大時間|
 |`CONFIG_INPUT_IQS9151_2F_TAP_ENABLE`|bool|`y`|2F Tap 有効/無効|
 |`CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS`|int|`130`|2F Tap 最大時間|
 |`CONFIG_INPUT_IQS9151_2F_TAP_MOVE`|int|`30`|2F Tap 移動しきい値（重心/距離）|
 |`CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE`|bool|`y`|2F deferred-click/drag 有効/無効|
-|`CONFIG_INPUT_IQS9151_2F_HOLD_MIN_MS`|int|`200`|互換項目（現行2F仕様では未使用）|
 |`CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS`|int|`200`|2F Tap後にBTN1を保持して2回目2Fタッチを待つ最大時間|
 |`CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE`|bool|`y`|2F 横スクロール有効/無効|
 |`CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE`|bool|`y`|2F 縦スクロール有効/無効|
@@ -58,7 +56,6 @@
 |`CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS`|int|`180`|3F Tap 最大時間|
 |`CONFIG_INPUT_IQS9151_3F_TAP_MOVE`|int|`30`|3F Tap 移動しきい値|
 |`CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE`|bool|`y`|3F deferred-click/drag 有効/無効|
-|`CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS`|int|`200`|互換項目（現行3F仕様では未使用）|
 |`CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS`|int|`230`|3F Tap後にBTN2を保持して2回目3Fタッチを待つ最大時間|
 |`CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD`|int|`300`|3F Swipe しきい値|
 

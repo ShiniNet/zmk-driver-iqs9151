@@ -43,7 +43,6 @@
     (`CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS`)
   - `ONE_FINGER_TAPDRAG_GAP_MAX_MS = 230`
     (`CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS`)
-  - `ONE_FINGER_HOLD_MIN_MS` / `ONE_FINGER_HOLD_MOVE` は互換項目（現行1F仕様では未使用）
 - 2F:
   - `TWO_FINGER_TAP_MAX_MS = 130` (`CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS`)
   - `TWO_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_2F_TAP_MOVE`)
@@ -51,7 +50,6 @@
     (`CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS`)
   - `TWO_FINGER_TAPDRAG_GAP_MAX_MS = 200`
     (`CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS`)
-  - `TWO_FINGER_HOLD_MIN_MS` / `TWO_FINGER_HOLD_MOVE` は互換項目（現行2F仕様では未使用）
   - `TWO_FINGER_SCROLL_START_MOVE = 50` (`CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE`)
   - `TWO_FINGER_PINCH_START_DISTANCE = 80` (`CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE`)
   - `TWO_FINGER_PINCH_WHEEL_GAIN_X10 = 40` (`CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10`)
@@ -64,7 +62,6 @@
     (`CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS`)
   - `THREE_FINGER_TAPDRAG_GAP_MAX_MS = 230`
     (`CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS`)
-  - `THREE_FINGER_HOLD_MIN_MS` / `THREE_FINGER_HOLD_MOVE` は互換項目（現行3F仕様では未使用）
   - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150` (固定)
   - `THREE_FINGER_ONE_LEAD_MAX_MS = 120` (固定)
   - `THREE_FINGER_TWO_LEAD_MAX_MS = 120` (固定)
@@ -184,7 +181,6 @@
 ## 5. 優先度・排他
 
 - 2F/3F の Tap は `release_pending` により段階リリースを許容する。
-- 2F/3F の legacy Hold (`*_HOLD_MIN_MS`) は互換項目であり、現行仕様では判定に使用しない。
 - `hold_button` は単一ラッチ。
   別Tap/Hold成立時は先に既存holdをreleaseし、新イベントは同フレーム抑止する。
 - 遷移フレームでは、旧セッション終了処理と新セッション開始判定を同一フレームで扱う。
@@ -244,3 +240,6 @@
 - 2026-03-05: 2Fの実測ログ（Run ID: 20260305_134715）に基づく閾値調整
   - 2F既定閾値を `TAP_MAX_MS=130`, `CLICK_HOLD_MAX_MS=200` に更新
   - 2F deferred-click 監視中の2回目タッチで `0->1->2` one-lead を許容
+- 2026-03-06: `*_HOLD_MIN_MS` 設定と到達不能 Hold 判定を削除
+  - `drivers/input/Kconfig` から `1F/2F/3F_HOLD_MIN_MS` を削除
+  - 2F/3F の到達不能 Hold 判定ブロックを `iqs9151.c` から削除

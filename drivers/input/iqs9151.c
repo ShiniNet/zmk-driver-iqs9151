@@ -50,9 +50,6 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define CURSOR_EMA_ALPHA 30
 #define ONE_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS
 #define TWO_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS
-#define ONE_FINGER_HOLD_MIN_MS CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS
-#define TWO_FINGER_HOLD_MIN_MS CONFIG_INPUT_IQS9151_2F_HOLD_MIN_MS
-#define THREE_FINGER_HOLD_MIN_MS CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS
 #define IQS9151_TAP_REENTRY_WINDOW_MS 30
 #define ONE_FINGER_TAPDRAG_GAP_MAX_MS CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS
 #define ONE_FINGER_CLICK_HOLD_MAX_MS ONE_FINGER_TAPDRAG_GAP_MAX_MS
@@ -68,21 +65,13 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define IQS9151_FINGER_HISTORY_SIZE 5
 #define THREE_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS
 #define THREE_FINGER_TAP_MOVE CONFIG_INPUT_IQS9151_3F_TAP_MOVE
-#define THREE_FINGER_HOLD_MOVE 40
 #define ONE_FINGER_TAP_MOVE CONFIG_INPUT_IQS9151_1F_TAP_MOVE
-#define ONE_FINGER_HOLD_MOVE 30
 #define TWO_FINGER_TAP_MOVE CONFIG_INPUT_IQS9151_2F_TAP_MOVE
-#define TWO_FINGER_HOLD_MOVE 40
 #define TWO_FINGER_SCROLL_START_MOVE CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE
 #define TWO_FINGER_PINCH_START_DISTANCE CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE
 #define TWO_FINGER_PINCH_WHEEL_DIV 12
 #define TWO_FINGER_PINCH_WHEEL_GAIN_X10 CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10
 #define TWO_FINGER_PINCH_WHEEL_GAIN_DEN 10
-
-BUILD_ASSERT(CONFIG_INPUT_IQS9151_2F_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS,
-             "2F_HOLD_MIN_MS must be >= 2F_TAP_MAX_MS");
-BUILD_ASSERT(CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS >= CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS,
-             "3F_HOLD_MIN_MS must be >= 3F_TAP_MAX_MS");
 
 struct iqs9151_config {
     struct i2c_dt_spec i2c;
@@ -1152,20 +1141,6 @@ static void iqs9151_two_finger_update(struct iqs9151_data *data,
             }
         }
 
-        if (!state->hold_sent && state->mode == IQS9151_2F_MODE_NONE &&
-            IS_ENABLED(CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE)) {
-            const bool tap_possible = state->tap_candidate &&
-                                      elapsed_ms <= TWO_FINGER_TAP_MAX_MS;
-            if (state->hold_candidate &&
-                !tap_possible &&
-                elapsed_ms >= TWO_FINGER_HOLD_MIN_MS &&
-                iqs9151_abs32(state->centroid_dx) <= TWO_FINGER_HOLD_MOVE &&
-                iqs9151_abs32(state->centroid_dy) <= TWO_FINGER_HOLD_MOVE &&
-                iqs9151_abs32(state->distance_delta) <= TWO_FINGER_HOLD_MOVE) {
-                state->hold_sent = iqs9151_emit_hold_press(data, dev, INPUT_BTN_1);
-            }
-        }
-
         if (state->mode == IQS9151_2F_MODE_SCROLL) {
             result->scroll_active = true;
             if (IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE)) {
@@ -1420,19 +1395,6 @@ static bool iqs9151_three_finger_update(struct iqs9151_data *data,
         }
         if (data->three_tapdrag_second_touch) {
             return true;
-        }
-
-        if (!data->three_swipe_sent && !data->three_hold_sent &&
-            IS_ENABLED(CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE)) {
-            const bool tap_possible = data->three_tap_candidate &&
-                                      elapsed <= THREE_FINGER_TAP_MAX_MS;
-            if (data->three_hold_candidate &&
-                !tap_possible &&
-                elapsed >= THREE_FINGER_HOLD_MIN_MS &&
-                iqs9151_abs32(data->three_dx) <= THREE_FINGER_HOLD_MOVE &&
-                iqs9151_abs32(data->three_dy) <= THREE_FINGER_HOLD_MOVE) {
-                data->three_hold_sent = iqs9151_emit_hold_press(data, dev, INPUT_BTN_2);
-            }
         }
 
         if (!data->three_swipe_sent && !data->three_hold_sent) {
