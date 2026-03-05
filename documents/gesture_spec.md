@@ -37,15 +37,21 @@
 - 共通:
   - `IQS9151_TAP_REENTRY_WINDOW_MS = 30` (固定)
 - 1F:
-  - `ONE_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS`)
+  - `ONE_FINGER_TAP_MAX_MS = 120` (`CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS`)
   - `ONE_FINGER_TAP_MOVE = 25` (`CONFIG_INPUT_IQS9151_1F_TAP_MOVE`)
-  - `ONE_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_1F_HOLD_MIN_MS`)
-  - `ONE_FINGER_HOLD_MOVE = 30` (固定)
+  - `ONE_FINGER_CLICK_HOLD_MAX_MS = 230`
+    (`CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS`)
+  - `ONE_FINGER_TAPDRAG_GAP_MAX_MS = 230`
+    (`CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS`)
+  - `ONE_FINGER_HOLD_MIN_MS` / `ONE_FINGER_HOLD_MOVE` は互換項目（現行1F仕様では未使用）
 - 2F:
-  - `TWO_FINGER_TAP_MAX_MS = 150` (`CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS`)
+  - `TWO_FINGER_TAP_MAX_MS = 130` (`CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS`)
   - `TWO_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_2F_TAP_MOVE`)
-  - `TWO_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_2F_HOLD_MIN_MS`)
-  - `TWO_FINGER_HOLD_MOVE = 40` (固定)
+  - `TWO_FINGER_CLICK_HOLD_MAX_MS = 200`
+    (`CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS`)
+  - `TWO_FINGER_TAPDRAG_GAP_MAX_MS = 200`
+    (`CONFIG_INPUT_IQS9151_2F_TAPDRAG_GAP_MAX_MS`)
+  - `TWO_FINGER_HOLD_MIN_MS` / `TWO_FINGER_HOLD_MOVE` は互換項目（現行2F仕様では未使用）
   - `TWO_FINGER_SCROLL_START_MOVE = 50` (`CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE`)
   - `TWO_FINGER_PINCH_START_DISTANCE = 80` (`CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE`)
   - `TWO_FINGER_PINCH_WHEEL_GAIN_X10 = 40` (`CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10`)
@@ -54,9 +60,11 @@
 - 3F:
   - `THREE_FINGER_TAP_MAX_MS = 180` (`CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS`)
   - `THREE_FINGER_TAP_MOVE = 30` (`CONFIG_INPUT_IQS9151_3F_TAP_MOVE`)
-  - `THREE_FINGER_PRESSHOLD_ENABLE` (`CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE`)
-  - `THREE_FINGER_HOLD_MIN_MS = 200` (`CONFIG_INPUT_IQS9151_3F_HOLD_MIN_MS`)
-  - `THREE_FINGER_HOLD_MOVE = 40` (固定)
+  - `THREE_FINGER_CLICK_HOLD_MAX_MS = 230`
+    (`CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS`)
+  - `THREE_FINGER_TAPDRAG_GAP_MAX_MS = 230`
+    (`CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS`)
+  - `THREE_FINGER_HOLD_MIN_MS` / `THREE_FINGER_HOLD_MOVE` は互換項目（現行3F仕様では未使用）
   - `THREE_FINGER_RELEASE_PENDING_MAX_MS = 150` (固定)
   - `THREE_FINGER_ONE_LEAD_MAX_MS = 120` (固定)
   - `THREE_FINGER_TWO_LEAD_MAX_MS = 120` (固定)
@@ -75,15 +83,21 @@
     `prev==0` または `TAP_REENTRY_WINDOW_MS` 内に `finger_count==0`
   - 成立: `finger_count==0` かつ
     `elapsed<=ONE_FINGER_TAP_MAX_MS` かつ `abs(dx/dy)<=ONE_FINGER_TAP_MOVE`
-  - 出力: `INPUT_BTN_0` click
-- 1F Hold:
-  - hold候補:
-    - セッション開始時に `hold_candidate=true`
-    - `abs(dx)>ONE_FINGER_HOLD_MOVE` または `abs(dy)>ONE_FINGER_HOLD_MOVE` を
-      **一度でも超えたら** `hold_candidate=false`（同一接触中は復帰しない）
-  - 条件: `hold_candidate==true` かつ `elapsed>=ONE_FINGER_HOLD_MIN_MS` かつ
-    `abs(dx/dy)<=ONE_FINGER_HOLD_MOVE` かつ Tap未成立
-  - 出力: `INPUT_BTN_0` press（ラッチ）
+  - `CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE=y` のとき:
+    - `INPUT_BTN_0` を即 press し、`ONE_FINGER_CLICK_HOLD_MAX_MS` まで保持
+    - 監視中に2回目タッチが来なければ timeout で release（単クリック確定）
+  - `CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE=n` のとき:
+    - `INPUT_BTN_0` click（press+release）
+- 1F 2回目タッチ（Tap後監視中）:
+  - 開始条件: 1回目Tap成立後、`ONE_FINGER_CLICK_HOLD_MAX_MS` 以内の `0->1`
+  - 2回目Tap成立:
+    - 2回目の `elapsed<=ONE_FINGER_TAP_MAX_MS`
+    - `abs(dx/dy)<=ONE_FINGER_TAP_MOVE`
+    - 出力: 先に保持中 `INPUT_BTN_0` を release してから `INPUT_BTN_0` click
+      （ダブルクリック相当）
+  - 2回目Touch継続:
+    - 上記Tap条件を外れた場合は Drag扱いとして `INPUT_BTN_0` press を維持
+    - finger-up で `INPUT_BTN_0` release
 
 ### 4.2 2F
 
@@ -98,18 +112,24 @@
   - 段階リリース:
     - `2->1` で `release_pending` に入り、`TWO_FINGER_RELEASE_PENDING_MAX_MS` 以内の
       `1->0` をTap成立として扱う
-  - 出力: `INPUT_BTN_1` click
-- 2F Hold:
-  - hold候補:
-    - セッション開始時に `hold_candidate=true`
-    - `abs(centroid_dx/dy)>TWO_FINGER_HOLD_MOVE` または
-      `abs(distance_delta)>TWO_FINGER_HOLD_MOVE` を
-      **一度でも超えたら** `hold_candidate=false`（同一接触中は復帰しない）
-  - 条件: `mode==NONE` かつ `hold_candidate==true` かつ
-    `elapsed>=TWO_FINGER_HOLD_MIN_MS` かつ
-    `abs(centroid_dx/dy)<=TWO_FINGER_HOLD_MOVE` かつ
-    `abs(distance_delta)<=TWO_FINGER_HOLD_MOVE` かつ Tap未成立
-  - 出力: `INPUT_BTN_1` press（ラッチ）
+  - `CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE=y` のとき:
+    - `INPUT_BTN_1` を即 press し、`TWO_FINGER_CLICK_HOLD_MAX_MS` まで保持
+    - 監視中に2回目2Fタッチが来なければ timeout で release（単クリック確定）
+  - `CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE=n` のとき:
+    - `INPUT_BTN_1` click（press+release）
+- 2F 2回目タッチ（Tap後監視中）:
+  - 開始条件:
+    - 1回目2F Tap成立後、`TWO_FINGER_CLICK_HOLD_MAX_MS` 以内の `0->2`
+    - または `0->1->2` one-lead（2回目タッチでも許容）
+  - 2回目Tap成立:
+    - 2回目の `elapsed<=TWO_FINGER_TAP_MAX_MS`
+    - `abs(centroid_dx/dy)<=TWO_FINGER_TAP_MOVE`
+    - `abs(distance_delta)<=TWO_FINGER_TAP_MOVE`
+    - 出力: 先に保持中 `INPUT_BTN_1` を release してから `INPUT_BTN_1` click
+      （ダブルクリック相当）
+  - 2回目Touch継続:
+    - 上記Tap条件を外れた場合は Drag扱いとして `INPUT_BTN_1` press を維持
+    - 全指離し (`finger_count==0`) で `INPUT_BTN_1` release
 - 2F Scroll:
   - 開始: `mode==NONE` かつ
     `max(abs(centroid_dx), abs(centroid_dy)) >= TWO_FINGER_SCROLL_START_MOVE`
@@ -138,29 +158,33 @@
   - 段階リリース:
     - `3->(2/1)` で `release_pending` に入り、
       `THREE_FINGER_RELEASE_PENDING_MAX_MS` 以内の `->0` をTap成立として扱う
-  - 出力: `INPUT_BTN_2` click
-- 3F Hold:
-  - 有効条件: `CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=y`
-  - hold候補:
-    - セッション開始時に `three_hold_candidate=true`
-    - `abs(dx)>THREE_FINGER_HOLD_MOVE` または `abs(dy)>THREE_FINGER_HOLD_MOVE` を
-      **一度でも超えたら** `three_hold_candidate=false`（同一接触中は復帰しない）
-  - 条件: `three_hold_candidate==true` かつ `elapsed>=THREE_FINGER_HOLD_MIN_MS` かつ
-    `abs(dx/dy)<=THREE_FINGER_HOLD_MOVE` かつ Tap未成立
-  - 出力: `INPUT_BTN_2` press（ラッチ）
+  - `CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=y` のとき:
+    - `INPUT_BTN_2` を即 press し、`THREE_FINGER_CLICK_HOLD_MAX_MS` まで保持
+    - 監視中に2回目3Fタッチが来なければ timeout で release（単クリック確定）
+  - `CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=n` のとき:
+    - `INPUT_BTN_2` click（press+release）
+- 3F 2回目タッチ（Tap後監視中）:
+  - 開始条件: 1回目3F Tap成立後、`THREE_FINGER_CLICK_HOLD_MAX_MS` 以内の `0->3`
+  - 2回目Tap成立:
+    - 2回目の `elapsed<=THREE_FINGER_TAP_MAX_MS`
+    - `abs(dx/dy)<=THREE_FINGER_TAP_MOVE`
+    - 出力: 先に保持中 `INPUT_BTN_2` を release してから `INPUT_BTN_2` click
+      （ダブルクリック相当）
+  - 2回目Touch継続:
+    - 上記Tap条件を外れた場合は Drag扱いとして `INPUT_BTN_2` press を維持
+    - 全指離し (`finger_count==0`) で `INPUT_BTN_2` release
 - 3F Swipe:
+  - 1回目3F接触中のみ判定（2回目監視中は無効）
   - 条件: `abs(dx)` または `abs(dy)` が
     `CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD` を超過
   - 出力: 方向別 `INPUT_BTN_3/4/5/6` click
   - 1ショット: 成立後に `three_swipe_sent=true` を保持し、
     3本指接触が終了するまで同一接触中は再送しない
-- Hold/Swipe競合:
-  - 同時成立時は Hold 優先
 
 ## 5. 優先度・排他
 
-- Tap/Hold競合は `tap_possible` 条件で排他し、Tap候補中はHoldを出さない。
-- Hold は move閾値超過で候補を失効し、同一接触中に再成立しない。
+- 2F/3F の Tap は `release_pending` により段階リリースを許容する。
+- 2F/3F の legacy Hold (`*_HOLD_MIN_MS`) は互換項目であり、現行仕様では判定に使用しない。
 - `hold_button` は単一ラッチ。
   別Tap/Hold成立時は先に既存holdをreleaseし、新イベントは同フレーム抑止する。
 - 遷移フレームでは、旧セッション終了処理と新セッション開始判定を同一フレームで扱う。
@@ -169,12 +193,22 @@
 ## 6. 出力イベント
 
 - Click:
-  - 1F Tap: `INPUT_BTN_0` (press + release)
-  - 2F Tap: `INPUT_BTN_1` (press + release)
-  - 3F Tap: `INPUT_BTN_2` (press + release)
+  - 1F Tap:
+    - `CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE=y`: `INPUT_BTN_0` press -> (timeout または2回目タッチ判定後) release
+    - `CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE=n`: `INPUT_BTN_0` click
+  - 1F Double Tap: 1回目保持中 `INPUT_BTN_0` release + `INPUT_BTN_0` click
+  - 2F Tap:
+    - `CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE=y`: `INPUT_BTN_1` press -> (timeout または2回目タッチ判定後) release
+    - `CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE=n`: `INPUT_BTN_1` click
+  - 2F Double Tap: 1回目保持中 `INPUT_BTN_1` release + `INPUT_BTN_1` click
+  - 3F Tap:
+    - `CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=y`: `INPUT_BTN_2` press -> (timeout または2回目タッチ判定後) release
+    - `CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=n`: `INPUT_BTN_2` click
+  - 3F Double Tap: 1回目保持中 `INPUT_BTN_2` release + `INPUT_BTN_2` click
 - Hold:
-  - 1F/2F Hold: `INPUT_BTN_0/1` press（別Tap/Holdでrelease）
-  - 3F Hold: `INPUT_BTN_2` press（`CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE=y` のとき）
+  - 1F TapDrag: 1回目Tap時点から `INPUT_BTN_0` press を維持し、2回目タッチUPでrelease
+  - 2F TapDrag: 1回目Tap時点から `INPUT_BTN_1` press を維持し、全指離しでrelease
+  - 3F TapDrag: 1回目Tap時点から `INPUT_BTN_2` press を維持し、全指離しでrelease
 - Swipe:
   - 3F: `INPUT_BTN_3/4/5/6` click
 - Pinch:
@@ -196,3 +230,17 @@
   - 3F Swipe の1ショット実装を `three_swipe_sent` ラッチ方式に更新
 - 2026-02-28: HOLD候補の失効ルールを追記
   - 1F/2F/3F Hold は、Hold移動閾値を一度でも超えた接触では再成立しない仕様に更新
+- 2026-03-04: 1F Hold を TapDrag 方式へ変更
+  - 1回目短タップ後、`ONE_FINGER_TAPDRAG_GAP_MAX_MS` 以内の2回目タッチで Hold 判定
+  - 1F Hold のラッチ解除方式を廃止し、2回目タッチUPで即 release に更新
+- 2026-03-05: 1F Tap/Drag を deferred-click 方式へ更新
+  - 1回目Tapで `INPUT_BTN_0` を即 press し、`ONE_FINGER_CLICK_HOLD_MAX_MS` まで保持
+  - 2回目タッチなしは timeout release、2回目短タップは double click、継続タッチは drag継続に更新
+  - 1F既定閾値を `TAP_MAX_MS=120`, `CLICK_HOLD_MAX_MS=230` に更新
+- 2026-03-05: 2F/3F Tap/Drag を deferred-click 方式へ更新
+  - 2F/3Fも 1回目Tapで `BTN1/BTN2` を即 press し、`*_CLICK_HOLD_MAX_MS=230` まで保持
+  - 2回目タッチなしは timeout release、2回目短タップは double click、継続タッチは drag継続に更新
+  - 2F/3F の `*_HOLD_MIN_MS` は互換項目（現行仕様では未使用）へ整理
+- 2026-03-05: 2Fの実測ログ（Run ID: 20260305_134715）に基づく閾値調整
+  - 2F既定閾値を `TAP_MAX_MS=130`, `CLICK_HOLD_MAX_MS=200` に更新
+  - 2F deferred-click 監視中の2回目タッチで `0->1->2` one-lead を許容
