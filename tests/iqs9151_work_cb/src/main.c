@@ -160,6 +160,38 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_reports_and_starts_scroll_inerti
     zassert_equal(fixture->log.events[0].value, -60, "Unexpected HWHEEL delta");
 }
 
+ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_tail_two_to_one_to_zero_suppresses_cursor_path) {
+    const struct iqs9151_test_frame two_start =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame two_scroll =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 160, 100, 260, 100);
+    const struct iqs9151_test_frame one_tail_move =
+        make_frame(1U,
+                   IQS9151_TP_FINGER2_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   11, -9, 0, UINT16_MAX, UINT16_MAX, 260, 140);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &two_start, 0);
+    iqs9151_test_process_frame(fixture->ctx, &two_scroll, 10);
+    iqs9151_test_process_frame(fixture->ctx, &one_tail_move, 20);
+    iqs9151_test_process_frame(fixture->ctx, &release, 30);
+
+    zassert_true(iqs9151_test_scroll_inertia_active(fixture->ctx),
+                 "Scroll inertia should start on 2F scroll release");
+    zassert_false(iqs9151_test_cursor_inertia_active(fixture->ctx),
+                  "Cursor inertia must stay off for a 2F scroll tail");
+    zassert_equal(fixture->log.count, 1U,
+                  "Only the 2F scroll REL event should be reported");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_REL, "Not a REL event");
+    zassert_equal(fixture->log.events[0].code, INPUT_REL_HWHEEL, "Unexpected REL code");
+    zassert_equal(fixture->log.events[0].value, -60, "Unexpected HWHEEL delta");
+}
+
 ZTEST_F(iqs9151_work_cb, test_two_finger_pinch_reports_btn7_and_wheel) {
     const struct iqs9151_test_frame two_start =
         make_frame(2U,
@@ -188,6 +220,46 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_pinch_reports_btn7_and_wheel) {
         (80 * CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10) / (12 * 10);
     zassert_equal(fixture->log.events[1].value, expected_wheel, "Event[1] unexpected wheel value");
 
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
+    zassert_equal(fixture->log.events[2].code, INPUT_BTN_7, "Event[2] unexpected code");
+    zassert_equal(fixture->log.events[2].value, 0, "Event[2] should be BTN7 release");
+}
+
+ZTEST_F(iqs9151_work_cb, test_two_finger_pinch_tail_two_to_one_to_zero_suppresses_cursor_path) {
+    const struct iqs9151_test_frame two_start =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame two_pinch =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 60, 100, 240, 100);
+    const struct iqs9151_test_frame one_tail_move =
+        make_frame(1U,
+                   IQS9151_TP_FINGER2_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   9, 7, 0, UINT16_MAX, UINT16_MAX, 245, 108);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &two_start, 0);
+    iqs9151_test_process_frame(fixture->ctx, &two_pinch, 10);
+    iqs9151_test_process_frame(fixture->ctx, &one_tail_move, 20);
+    iqs9151_test_process_frame(fixture->ctx, &release, 30);
+
+    zassert_false(iqs9151_test_scroll_inertia_active(fixture->ctx),
+                  "Scroll inertia should remain off for a pinch tail");
+    zassert_false(iqs9151_test_cursor_inertia_active(fixture->ctx),
+                  "Cursor inertia must stay off for a 2F pinch tail");
+    zassert_equal(fixture->log.count, 3U,
+                  "Expected pinch press/wheel/release only");
+    zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_KEY, "Event[0] not key");
+    zassert_equal(fixture->log.events[0].code, INPUT_BTN_7, "Event[0] unexpected code");
+    zassert_equal(fixture->log.events[0].value, 1, "Event[0] should be BTN7 press");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_REL, "Event[1] not rel");
+    zassert_equal(fixture->log.events[1].code, INPUT_REL_WHEEL, "Event[1] unexpected code");
+    zassert_equal(fixture->log.events[1].value,
+                  (80 * CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10) / (12 * 10),
+                  "Event[1] unexpected wheel value");
     zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_KEY, "Event[2] not key");
     zassert_equal(fixture->log.events[2].code, INPUT_BTN_7, "Event[2] unexpected code");
     zassert_equal(fixture->log.events[2].value, 0, "Event[2] should be BTN7 release");
