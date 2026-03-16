@@ -32,6 +32,7 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define EMA_FP_SHIFT INERTIA_FP_SHIFT
 #define EMA_ALPHA_DEN (1 << EMA_FP_SHIFT)
 #define IQS9151_FRAME_READ_SIZE 28
+#define IQS9151_INERTIA_MOTION_HISTORY_SIZE 12
 
 #define SCROLL_INERTIA_INTERVAL_MS 10
 #define SCROLL_INERTIA_MAX_DURATION_MS 3000
@@ -40,6 +41,10 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define SCROLL_INERTIA_START_THRESHOLD 1
 #define SCROLL_INERTIA_MIN_VELOCITY 1
 #define SCROLL_EMA_ALPHA 10
+#define SCROLL_INERTIA_RECENT_WINDOW_MS CONFIG_INPUT_IQS9151_SCROLL_INERTIA_RECENT_WINDOW_MS
+#define SCROLL_INERTIA_STALE_GAP_MS CONFIG_INPUT_IQS9151_SCROLL_INERTIA_STALE_GAP_MS
+#define SCROLL_INERTIA_MIN_SAMPLES CONFIG_INPUT_IQS9151_SCROLL_INERTIA_MIN_SAMPLES
+#define SCROLL_INERTIA_MIN_AVG_SPEED CONFIG_INPUT_IQS9151_SCROLL_INERTIA_MIN_AVG_SPEED
 
 #define CURSOR_INERTIA_INTERVAL_MS 10
 #define CURSOR_INERTIA_MAX_DURATION_MS 3000
@@ -48,6 +53,10 @@ LOG_MODULE_REGISTER(iqs9151, CONFIG_INPUT_IQS9151_LOG_LEVEL);
 #define CURSOR_INERTIA_START_THRESHOLD 2
 #define CURSOR_INERTIA_MIN_VELOCITY 2
 #define CURSOR_EMA_ALPHA 30
+#define CURSOR_INERTIA_RECENT_WINDOW_MS CONFIG_INPUT_IQS9151_CURSOR_INERTIA_RECENT_WINDOW_MS
+#define CURSOR_INERTIA_STALE_GAP_MS CONFIG_INPUT_IQS9151_CURSOR_INERTIA_STALE_GAP_MS
+#define CURSOR_INERTIA_MIN_SAMPLES CONFIG_INPUT_IQS9151_CURSOR_INERTIA_MIN_SAMPLES
+#define CURSOR_INERTIA_MIN_AVG_SPEED CONFIG_INPUT_IQS9151_CURSOR_INERTIA_MIN_AVG_SPEED
 #define ONE_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS
 #define TWO_FINGER_TAP_MAX_MS CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS
 #define IQS9151_TAP_REENTRY_WINDOW_MS 30
@@ -144,6 +153,12 @@ struct iqs9151_inertia_params {
     int16_t min_velocity;
     uint16_t ema_alpha;
 };
+struct iqs9151_inertia_gate_params {
+    uint16_t recent_window_ms;
+    uint16_t stale_gap_ms;
+    uint8_t min_samples;
+    int16_t min_avg_speed;
+};
 struct iqs9151_inertia_state {
     bool active;
     int32_t vx_fp;
@@ -157,6 +172,16 @@ struct iqs9151_inertia_state {
 struct iqs9151_finger_history_entry {
     int64_t ms;
     uint8_t finger_count;
+};
+struct iqs9151_motion_sample {
+    int64_t ms;
+    int16_t x;
+    int16_t y;
+};
+struct iqs9151_motion_history {
+    struct iqs9151_motion_sample samples[IQS9151_INERTIA_MOTION_HISTORY_SIZE];
+    uint8_t head;
+    uint8_t count;
 };
 
 struct iqs9151_data {
@@ -174,6 +199,8 @@ struct iqs9151_data {
     int32_t scroll_ema_y_fp;
     int32_t cursor_ema_x_fp;
     int32_t cursor_ema_y_fp;
+    struct iqs9151_motion_history scroll_motion_history;
+    struct iqs9151_motion_history cursor_motion_history;
     struct iqs9151_one_finger_state one_finger;
     struct iqs9151_two_finger_state two_finger;
     bool one_finger_click_pending;
@@ -477,6 +504,12 @@ static const struct iqs9151_inertia_params iqs9151_scroll_params = {
     .min_velocity = SCROLL_INERTIA_MIN_VELOCITY,
     .ema_alpha = SCROLL_EMA_ALPHA,
 };
+static const struct iqs9151_inertia_gate_params iqs9151_scroll_gate_params = {
+    .recent_window_ms = SCROLL_INERTIA_RECENT_WINDOW_MS,
+    .stale_gap_ms = SCROLL_INERTIA_STALE_GAP_MS,
+    .min_samples = SCROLL_INERTIA_MIN_SAMPLES,
+    .min_avg_speed = SCROLL_INERTIA_MIN_AVG_SPEED,
+};
 static const struct iqs9151_inertia_params iqs9151_cursor_params = {
     .interval_ms = CURSOR_INERTIA_INTERVAL_MS,
     .max_duration_ms = CURSOR_INERTIA_MAX_DURATION_MS,
@@ -486,6 +519,12 @@ static const struct iqs9151_inertia_params iqs9151_cursor_params = {
     .start_threshold = CURSOR_INERTIA_START_THRESHOLD,
     .min_velocity = CURSOR_INERTIA_MIN_VELOCITY,
     .ema_alpha = CURSOR_EMA_ALPHA,
+};
+static const struct iqs9151_inertia_gate_params iqs9151_cursor_gate_params = {
+    .recent_window_ms = CURSOR_INERTIA_RECENT_WINDOW_MS,
+    .stale_gap_ms = CURSOR_INERTIA_STALE_GAP_MS,
+    .min_samples = CURSOR_INERTIA_MIN_SAMPLES,
+    .min_avg_speed = CURSOR_INERTIA_MIN_AVG_SPEED,
 };
 
 static int iqs9151_i2c_write(const struct iqs9151_config *cfg, uint16_t reg, const uint8_t *buf, size_t len) {
@@ -672,6 +711,123 @@ static void iqs9151_ema_update(int32_t *ema_x_fp, int32_t *ema_y_fp,
         ((*ema_x_fp * (int32_t)alpha) + (sample_x_fp * inv_alpha)) >> EMA_FP_SHIFT;
     *ema_y_fp =
         ((*ema_y_fp * (int32_t)alpha) + (sample_y_fp * inv_alpha)) >> EMA_FP_SHIFT;
+}
+
+static void iqs9151_motion_history_reset(struct iqs9151_motion_history *history) {
+    memset(history, 0, sizeof(*history));
+}
+
+static void iqs9151_motion_history_push(struct iqs9151_motion_history *history,
+                                        int16_t sample_x, int16_t sample_y,
+                                        int64_t now_ms) {
+    struct iqs9151_motion_sample *entry;
+
+    if (sample_x == 0 && sample_y == 0) {
+        return;
+    }
+
+    entry = &history->samples[history->head];
+    entry->ms = now_ms;
+    entry->x = sample_x;
+    entry->y = sample_y;
+
+    history->head =
+        (uint8_t)((history->head + 1U) % IQS9151_INERTIA_MOTION_HISTORY_SIZE);
+    if (history->count < IQS9151_INERTIA_MOTION_HISTORY_SIZE) {
+        history->count++;
+    }
+}
+
+static bool iqs9151_inertia_seed_from_history(
+    const struct iqs9151_motion_history *history,
+    const struct iqs9151_inertia_params *params,
+    const struct iqs9151_inertia_gate_params *gate,
+    int64_t now_ms,
+    int32_t *seed_vx_fp,
+    int32_t *seed_vy_fp) {
+    struct iqs9151_motion_sample recent[IQS9151_INERTIA_MOTION_HISTORY_SIZE];
+    uint8_t recent_count = 0U;
+    int32_t total_x = 0;
+    int32_t total_y = 0;
+    int64_t latest_ms;
+    int64_t earliest_ms;
+    int64_t span_ms;
+    int32_t avg_speed;
+    int32_t dominant_total;
+    uint8_t consistent_count = 0U;
+
+    for (uint8_t i = 0U; i < history->count; i++) {
+        const uint8_t idx =
+            (uint8_t)((history->head + IQS9151_INERTIA_MOTION_HISTORY_SIZE - 1U - i) %
+                      IQS9151_INERTIA_MOTION_HISTORY_SIZE);
+        const struct iqs9151_motion_sample *entry = &history->samples[idx];
+        const int64_t elapsed_ms = now_ms - entry->ms;
+
+        if (elapsed_ms > gate->recent_window_ms) {
+            break;
+        }
+
+        recent[recent_count++] = *entry;
+    }
+
+    if (recent_count < gate->min_samples) {
+        return false;
+    }
+
+    latest_ms = recent[0].ms;
+    if ((now_ms - latest_ms) > gate->stale_gap_ms) {
+        return false;
+    }
+
+    earliest_ms = recent[recent_count - 1U].ms;
+    for (uint8_t i = 0U; i < recent_count; i++) {
+        total_x += recent[i].x;
+        total_y += recent[i].y;
+    }
+
+    if (total_x == 0 && total_y == 0) {
+        return false;
+    }
+
+    if (iqs9151_abs32(total_x) >= iqs9151_abs32(total_y)) {
+        dominant_total = total_x;
+        for (uint8_t i = 0U; i < recent_count; i++) {
+            if ((recent[i].x > 0 && dominant_total > 0) ||
+                (recent[i].x < 0 && dominant_total < 0)) {
+                consistent_count++;
+            }
+        }
+    } else {
+        dominant_total = total_y;
+        for (uint8_t i = 0U; i < recent_count; i++) {
+            if ((recent[i].y > 0 && dominant_total > 0) ||
+                (recent[i].y < 0 && dominant_total < 0)) {
+                consistent_count++;
+            }
+        }
+    }
+
+    if (consistent_count < gate->min_samples) {
+        return false;
+    }
+
+    span_ms = latest_ms - earliest_ms;
+    if (span_ms < params->interval_ms) {
+        span_ms = params->interval_ms;
+    }
+
+    avg_speed = (int32_t)(((int64_t)(iqs9151_abs32(total_x) + iqs9151_abs32(total_y)) *
+                           params->interval_ms) /
+                          span_ms);
+    if (avg_speed < gate->min_avg_speed) {
+        return false;
+    }
+
+    *seed_vx_fp = (int32_t)((((int64_t)total_x * params->interval_ms) << params->fp_shift) /
+                            span_ms);
+    *seed_vy_fp = (int32_t)((((int64_t)total_y * params->interval_ms) << params->fp_shift) /
+                            span_ms);
+    return true;
 }
 
 static void iqs9151_inertia_state_reset(struct iqs9151_inertia_state *state) {
@@ -1798,6 +1954,8 @@ static bool iqs9151_handle_show_reset(struct iqs9151_data *data,
     iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
     iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
     iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    iqs9151_motion_history_reset(&data->scroll_motion_history);
+    iqs9151_motion_history_reset(&data->cursor_motion_history);
     memset(&data->prev_frame, 0, sizeof(data->prev_frame));
     return true;
 }
@@ -1944,6 +2102,7 @@ static void iqs9151_update_inertia_ema(struct iqs9151_data *data,
                                        const struct iqs9151_frame *frame,
                                        const struct iqs9151_frame *prev_frame,
                                        const struct iqs9151_two_finger_result *two_result,
+                                       int64_t now_ms,
                                        bool released_from_hold,
                                        bool cursor_moving,
                                        bool suppress_cursor_tail) {
@@ -1951,6 +2110,8 @@ static void iqs9151_update_inertia_ema(struct iqs9151_data *data,
         (prev_frame->finger_count == 0U) && (frame->finger_count == 1U);
     const bool cursor_released =
         (prev_frame->finger_count == 1U) && (frame->finger_count == 0U);
+    int32_t seed_vx_fp;
+    int32_t seed_vy_fp;
 
     /* Cancel Inertial */
     if (two_result->scroll_started || frame->finger_count == 2U) {
@@ -1961,44 +2122,59 @@ static void iqs9151_update_inertia_ema(struct iqs9151_data *data,
         iqs9151_ema_update(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp,
                            two_result->scroll_x, two_result->scroll_y,
                            iqs9151_scroll_params.ema_alpha);
+        iqs9151_motion_history_push(&data->scroll_motion_history, two_result->scroll_x,
+                                    two_result->scroll_y, now_ms);
     }
 
     if (suppress_cursor_tail) {
         iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
         iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+        iqs9151_motion_history_reset(&data->cursor_motion_history);
     } else {
         if (finger1_started) {
             iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+            iqs9151_motion_history_reset(&data->cursor_motion_history);
         }
         if (frame->finger_count == 1U && cursor_moving) {
             iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
             iqs9151_ema_update(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp,
                                frame->rel_x, frame->rel_y, iqs9151_cursor_params.ema_alpha);
+            iqs9151_motion_history_push(&data->cursor_motion_history, frame->rel_x,
+                                        frame->rel_y, now_ms);
         }
     }
 
     /* Inertial Cursolling */
     if (cursor_released && !released_from_hold && !suppress_cursor_tail) {
-        if (IS_ENABLED(CONFIG_INPUT_IQS9151_CURSOR_INERTIA_ENABLE)) {
+        if (IS_ENABLED(CONFIG_INPUT_IQS9151_CURSOR_INERTIA_ENABLE) &&
+            iqs9151_inertia_seed_from_history(&data->cursor_motion_history,
+                                              &iqs9151_cursor_params,
+                                              &iqs9151_cursor_gate_params, now_ms,
+                                              &seed_vx_fp, &seed_vy_fp)) {
             iqs9151_inertia_start(&data->inertia_cursor, &data->inertia_cursor_work,
-                                  &iqs9151_cursor_params,
-                                  data->cursor_ema_x_fp, data->cursor_ema_y_fp);
+                                  &iqs9151_cursor_params, seed_vx_fp, seed_vy_fp);
         }
         iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+        iqs9151_motion_history_reset(&data->cursor_motion_history);
     }
 
     /* Inertial Scrolling */
     if (two_result->scroll_ended) {
-        if (IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_INERTIA_ENABLE)) {
+        if (IS_ENABLED(CONFIG_INPUT_IQS9151_SCROLL_INERTIA_ENABLE) &&
+            iqs9151_inertia_seed_from_history(&data->scroll_motion_history,
+                                              &iqs9151_scroll_params,
+                                              &iqs9151_scroll_gate_params, now_ms,
+                                              &seed_vx_fp, &seed_vy_fp)) {
             iqs9151_inertia_start(&data->inertia_scroll, &data->inertia_scroll_work,
-                                  &iqs9151_scroll_params,
-                                  data->scroll_ema_x_fp, data->scroll_ema_y_fp);
+                                  &iqs9151_scroll_params, seed_vx_fp, seed_vy_fp);
         }
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+        iqs9151_motion_history_reset(&data->scroll_motion_history);
     }
     if (two_result->pinch_active) {
         iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
+        iqs9151_motion_history_reset(&data->scroll_motion_history);
     }
 }
 
@@ -2062,10 +2238,13 @@ static void iqs9151_process_frame(struct iqs9151_data *data,
         iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
         iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+        iqs9151_motion_history_reset(&data->scroll_motion_history);
+        iqs9151_motion_history_reset(&data->cursor_motion_history);
     }
 
     if (data->one_finger.active && data->one_finger.hold_sent) {
         iqs9151_inertia_cancel(&data->inertia_cursor, &data->inertia_cursor_work);
+        iqs9151_motion_history_reset(&data->cursor_motion_history);
     }
 
     iqs9151_report_frame_events(dev, frame, &two_result, cursor_moving,
@@ -2079,7 +2258,7 @@ static void iqs9151_process_frame(struct iqs9151_data *data,
             data->hold_button,
             data->two_finger.mode);
 
-    iqs9151_update_inertia_ema(data, frame, &prev_frame, &two_result,
+    iqs9151_update_inertia_ema(data, frame, &prev_frame, &two_result, now_ms,
                                released_from_hold, cursor_moving,
                                suppress_cursor_tail);
     iqs9151_update_prev_frame(data, frame, &prev_frame);
@@ -2465,6 +2644,8 @@ static int iqs9151_init(const struct device *dev) {
     iqs9151_inertia_state_reset(&data->inertia_cursor);
     iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
     iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    iqs9151_motion_history_reset(&data->scroll_motion_history);
+    iqs9151_motion_history_reset(&data->cursor_motion_history);
     iqs9151_one_finger_reset(&data->one_finger);
     iqs9151_two_finger_reset(&data->two_finger);
     iqs9151_clear_one_finger_click_pending(data);
@@ -2521,6 +2702,8 @@ void iqs9151_test_context_init(void *ctx, const struct device *dev) {
     iqs9151_inertia_state_reset(&data->inertia_cursor);
     iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
     iqs9151_ema_reset(&data->cursor_ema_x_fp, &data->cursor_ema_y_fp);
+    iqs9151_motion_history_reset(&data->scroll_motion_history);
+    iqs9151_motion_history_reset(&data->cursor_motion_history);
     iqs9151_one_finger_reset(&data->one_finger);
     iqs9151_two_finger_reset(&data->two_finger);
     iqs9151_clear_one_finger_click_pending(data);

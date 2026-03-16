@@ -48,18 +48,22 @@ endchoice
 
 config INPUT_IQS9151_RESOLUTION_X
     int "IQS9151 X resolution"
-    range 0 65535
+    range 0 4095
     default 2457
     help
       X Resolution (0x11E6).
+      Limited to 0-4095 to match the practical 12-bit trackpad
+      coordinate scale used by the device configuration.
       Currently not applied by the driver.
 
 config INPUT_IQS9151_RESOLUTION_Y
     int "IQS9151 Y resolution"
-    range 0 65535
+    range 0 4095
     default 3072
     help
       Y Resolution (0x11E8).
+      Limited to 0-4095 to match the practical 12-bit trackpad
+      coordinate scale used by the device configuration.
       Currently not applied by the driver.
 
 config INPUT_IQS9151_ATI_TARGETCOUNT
@@ -73,24 +77,28 @@ config INPUT_IQS9151_ATI_TARGETCOUNT
 
 config INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_SPEED
     int "IQS9151 dynamic filter bottom speed"
-    range 0 65535
-    default 20
+    range 0 2047
+    default 30
     help
       XY Dynamic Filter Bottom Speed (0x11EA).
+      Limited to 0-2047 to stay within the documented trackpad count
+      upper-limit scale.
       Currently not applied by the driver.
 
 config INPUT_IQS9151_DYNAMIC_FILTER_TOP_SPEED
     int "IQS9151 dynamic filter top speed"
-    range 0 65535
+    range 0 2047
     default 511
     help
       XY Dynamic Filter Top Speed (0x11EC).
+      Limited to 0-2047 to stay within the documented trackpad count
+      upper-limit scale.
       Currently not applied by the driver.
 
 config INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_BETA
     int "IQS9151 dynamic filter bottom beta"
     range 0 255
-    default 10
+    default 20
     help
       XY Dynamic Filter Bottom Beta (0x11EE).
       Currently not applied by the driver.
@@ -104,14 +112,14 @@ config INPUT_IQS9151_1F_TAP_ENABLE
 config INPUT_IQS9151_1F_TAP_MAX_MS
     int "IQS9151 single-finger tap max time (ms)"
     range 1 1000
-    default 120
+    default 250
     help
       Maximum down duration for 1F tap detection (driver-side).
 
 config INPUT_IQS9151_1F_TAP_MOVE
     int "IQS9151 single-finger tap move threshold"
     range 1 1000
-    default 25
+    default 50
     help
       Maximum accumulated movement for 1F tap detection (driver-side).
 
@@ -126,7 +134,7 @@ config INPUT_IQS9151_1F_PRESSHOLD_ENABLE
 config INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS
     int "IQS9151 single-finger deferred-click second-touch max time (ms)"
     range 1 1000
-    default 230
+    default 160
     help
       Maximum time to keep BTN0 pressed after a 1F tap while waiting
       for a second touch (driver-side).
@@ -140,9 +148,41 @@ config INPUT_IQS9151_CURSOR_INERTIA_ENABLE
 config INPUT_IQS9151_CURSOR_INERTIA_DECAY
     int "IQS9151 cursor inertia decay"
     range 0 1000
-    default 970
+    default 950
     help
       Cursor inertia decay (driver-side).
+
+config INPUT_IQS9151_CURSOR_INERTIA_RECENT_WINDOW_MS
+    int "IQS9151 cursor inertia recent window (ms)"
+    range 1 500
+    default 60
+    help
+      Time window used to evaluate recent single-finger motion before
+      allowing cursor inertia to start.
+
+config INPUT_IQS9151_CURSOR_INERTIA_STALE_GAP_MS
+    int "IQS9151 cursor inertia stale gap (ms)"
+    range 1 500
+    default 35
+    help
+      Maximum allowed time from the last single-finger motion sample to
+      finger release for cursor inertia to start.
+
+config INPUT_IQS9151_CURSOR_INERTIA_MIN_SAMPLES
+    int "IQS9151 cursor inertia minimum recent samples"
+    range 1 12
+    default 2
+    help
+      Minimum count of recent single-finger motion samples required to
+      start cursor inertia.
+
+config INPUT_IQS9151_CURSOR_INERTIA_MIN_AVG_SPEED
+    int "IQS9151 cursor inertia minimum average speed"
+    range 1 500
+    default 10
+    help
+      Minimum average recent single-finger speed required to start
+      cursor inertia.
 
 config INPUT_IQS9151_2F_TAP_ENABLE
     bool "IQS9151 two-finger tap enable"
@@ -153,14 +193,14 @@ config INPUT_IQS9151_2F_TAP_ENABLE
 config INPUT_IQS9151_2F_TAP_MAX_MS
     int "IQS9151 two-finger tap max time (ms)"
     range 1 1000
-    default 130
+    default 250
     help
       Maximum down duration for 2F tap detection (driver-side).
 
 config INPUT_IQS9151_2F_TAP_MOVE
     int "IQS9151 two-finger tap move threshold"
     range 1 1000
-    default 30
+    default 50
     help
       Maximum centroid/distance movement for 2F tap detection (driver-side).
 
@@ -208,9 +248,41 @@ config INPUT_IQS9151_SCROLL_INERTIA_ENABLE
 config INPUT_IQS9151_SCROLL_INERTIA_DECAY
     int "IQS9151 scroll inertia decay"
     range 0 1000
-    default 985
+    default 980
     help
       Scroll inertia decay (driver-side).
+
+config INPUT_IQS9151_SCROLL_INERTIA_RECENT_WINDOW_MS
+    int "IQS9151 scroll inertia recent window (ms)"
+    range 1 500
+    default 60
+    help
+      Time window used to evaluate recent two-finger scroll motion
+      before allowing scroll inertia to start.
+
+config INPUT_IQS9151_SCROLL_INERTIA_STALE_GAP_MS
+    int "IQS9151 scroll inertia stale gap (ms)"
+    range 1 500
+    default 35
+    help
+      Maximum allowed time from the last two-finger scroll sample to
+      release for scroll inertia to start.
+
+config INPUT_IQS9151_SCROLL_INERTIA_MIN_SAMPLES
+    int "IQS9151 scroll inertia minimum recent samples"
+    range 1 12
+    default 1
+    help
+      Minimum count of recent two-finger scroll samples required to
+      start scroll inertia.
+
+config INPUT_IQS9151_SCROLL_INERTIA_MIN_AVG_SPEED
+    int "IQS9151 scroll inertia minimum average speed"
+    range 1 500
+    default 4
+    help
+      Minimum average recent two-finger scroll speed required to start
+      scroll inertia.
 
 config INPUT_IQS9151_2F_PINCH_ENABLE
     bool "IQS9151 two-finger pinch enable"
@@ -221,7 +293,7 @@ config INPUT_IQS9151_2F_PINCH_ENABLE
 config INPUT_IQS9151_2F_PINCH_START_DISTANCE
     int "IQS9151 two-finger pinch start threshold"
     range 1 2000
-    default 80
+    default 100
     help
       Distance-delta threshold to start 2F pinch mode (driver-side).
 
@@ -242,14 +314,14 @@ config INPUT_IQS9151_3F_TAP_ENABLE
 config INPUT_IQS9151_3F_TAP_MAX_MS
     int "IQS9151 three-finger tap max time (ms)"
     range 1 1000
-    default 180
+    default 200
     help
       Maximum down duration for 3F tap detection (driver-side).
 
 config INPUT_IQS9151_3F_TAP_MOVE
     int "IQS9151 three-finger tap move threshold"
     range 1 1000
-    default 30
+    default 35
     help
       Maximum finger1 tracked movement for 3F tap detection (driver-side).
 
@@ -264,7 +336,7 @@ config INPUT_IQS9151_3F_PRESSHOLD_ENABLE
 config INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS
     int "IQS9151 three-finger deferred-click second-touch max time (ms)"
     range 1 1000
-    default 230
+    default 200
     help
       Maximum time to keep BTN2 pressed after a 3F tap while waiting
       for a second 3F touch (driver-side).
@@ -272,7 +344,7 @@ config INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS
 config INPUT_IQS9151_3F_SWIPE_THRESHOLD
     int "IQS9151 three-finger swipe threshold"
     range 0 1000
-    default 300
+    default 200
     help
       Three-finger swipe threshold (driver-side).
 

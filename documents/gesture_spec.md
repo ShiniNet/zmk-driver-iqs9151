@@ -95,6 +95,21 @@
   - 2回目Touch継続:
     - 上記Tap条件を外れた場合は Drag扱いとして `INPUT_BTN_0` press を維持
     - finger-up で `INPUT_BTN_0` release
+- 1F Cursor Inertia:
+  - 発動: `1->0` release かつ hold release 由来でない場合のみ
+  - 直近 `CONFIG_INPUT_IQS9151_CURSOR_INERTIA_RECENT_WINDOW_MS` ms の
+    1F移動サンプル (`REL_X/Y`) を評価する
+  - 条件:
+    - 最終移動サンプルから release まで
+      `<= CONFIG_INPUT_IQS9151_CURSOR_INERTIA_STALE_GAP_MS`
+    - 直近窓内の移動サンプル数
+      `>= CONFIG_INPUT_IQS9151_CURSOR_INERTIA_MIN_SAMPLES`
+    - 直近窓内の平均速度
+      `>= CONFIG_INPUT_IQS9151_CURSOR_INERTIA_MIN_AVG_SPEED`
+    - 優勢軸の符号が揃ったサンプル数
+      `>= CONFIG_INPUT_IQS9151_CURSOR_INERTIA_MIN_SAMPLES`
+  - seed: 窓内総移動量を経過時間で割り、10ms基準速度へ換算した値を使う
+  - release 前に停止して stale gap を超えた場合は発動しない
 
 ### 4.2 2F
 
@@ -132,6 +147,14 @@
   - 開始: `mode==NONE` かつ
     `max(abs(centroid_dx), abs(centroid_dy)) >= TWO_FINGER_SCROLL_START_MOVE`
   - 出力: `REL_HWHEEL` / `REL_WHEEL`（設定有効軸のみ）
+  - Scroll Inertia:
+    - `scroll_ended` 時に、直近
+      `CONFIG_INPUT_IQS9151_SCROLL_INERTIA_RECENT_WINDOW_MS` ms の
+      2F scroll サンプルを評価する
+    - 最終 scroll サンプルから release まで
+      `<= CONFIG_INPUT_IQS9151_SCROLL_INERTIA_STALE_GAP_MS`
+      かつ平均速度/サンプル数条件を満たす場合のみ発動する
+    - release 前に停止して stale gap を超えた場合は発動しない
   - 終端が `2->1->0` になった場合でも、残り1指は 1Fカーソルへフォールバックさせない
     - 尾部の `finger_count==1` では `REL_X/Y` を送出しない
     - 尾部の `finger_count==1` / `1->0` では cursor inertia の seed/start を行わない
@@ -259,3 +282,7 @@
 - 2026-03-08: 2F Scroll/Pinch 終端の `2->1->0` で 1Fカーソル系を抑止
   - Scroll/Pinch 尾部の `finger_count==1` では `REL_X/Y` を出さず、
     cursor inertia の seed/start も全指離しまで抑止する仕様に更新
+- 2026-03-16: inertia 発動条件を recent-window / stale-gap 判定へ更新
+  - 1F cursor inertia は release 直前の短時間窓に十分な速度と方向の持続がある場合のみ発動
+  - 指を停止したまま release した場合は stale gap により inertia を抑止
+  - 2F scroll inertia も同様に recent-window / stale-gap 判定へ更新

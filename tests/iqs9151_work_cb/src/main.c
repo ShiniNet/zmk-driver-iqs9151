@@ -6,7 +6,7 @@
 
 #include <string.h>
 
-#define IQS9151_TEST_CTX_BUF_SIZE 1024
+#define IQS9151_TEST_CTX_BUF_SIZE 1536
 #define IQS9151_TEST_MAX_EVENTS 32
 
 struct event_log {
@@ -133,6 +133,63 @@ ZTEST_F(iqs9151_work_cb, test_one_finger_release_starts_cursor_inertia) {
     }
 }
 
+ZTEST_F(iqs9151_work_cb, test_one_finger_release_after_stale_gap_does_not_start_cursor_inertia) {
+    const struct iqs9151_test_frame one_start =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   24, 0, 0, 100, 100, 0, 0);
+    const struct iqs9151_test_frame one_move =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   20, 0, 0, 140, 100, 0, 0);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &one_start, 0);
+    iqs9151_test_process_frame(fixture->ctx, &one_move, 10);
+    iqs9151_test_process_frame(fixture->ctx, &release, 80);
+
+    zassert_false(iqs9151_test_cursor_inertia_active(fixture->ctx),
+                  "Cursor inertia should stay off after a stale release");
+    zassert_equal(fixture->log.count, 4U,
+                  "Only REL events from active movement frames are expected");
+}
+
+ZTEST_F(iqs9151_work_cb, test_one_finger_release_after_slowdown_does_not_start_cursor_inertia) {
+    const struct iqs9151_test_frame fast_start =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   14, 0, 0, 100, 100, 0, 0);
+    const struct iqs9151_test_frame fast_move =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   12, 0, 0, 112, 100, 0, 0);
+    const struct iqs9151_test_frame slow_1 =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   1, 0, 0, 113, 100, 0, 0);
+    const struct iqs9151_test_frame slow_2 =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   1, 0, 0, 114, 100, 0, 0);
+    const struct iqs9151_test_frame slow_3 =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   1, 0, 0, 115, 100, 0, 0);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &fast_start, 0);
+    iqs9151_test_process_frame(fixture->ctx, &fast_move, 10);
+    iqs9151_test_process_frame(fixture->ctx, &slow_1, 20);
+    iqs9151_test_process_frame(fixture->ctx, &slow_2, 30);
+    iqs9151_test_process_frame(fixture->ctx, &slow_3, 40);
+    iqs9151_test_process_frame(fixture->ctx, &release, 50);
+
+    zassert_false(iqs9151_test_cursor_inertia_active(fixture->ctx),
+                  "Cursor inertia should stay off after slowing down before release");
+}
+
 ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_reports_and_starts_scroll_inertia) {
     const struct iqs9151_test_frame two_start =
         make_frame(2U,
@@ -158,6 +215,26 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_reports_and_starts_scroll_inerti
     zassert_equal(fixture->log.events[0].type, IQS9151_TEST_EVENT_REL, "Not a REL event");
     zassert_equal(fixture->log.events[0].code, INPUT_REL_HWHEEL, "Unexpected REL code");
     zassert_equal(fixture->log.events[0].value, -60, "Unexpected HWHEEL delta");
+}
+
+ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_release_after_stale_gap_does_not_start_inertia) {
+    const struct iqs9151_test_frame two_start =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame two_scroll =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 160, 100, 260, 100);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &two_start, 0);
+    iqs9151_test_process_frame(fixture->ctx, &two_scroll, 10);
+    iqs9151_test_process_frame(fixture->ctx, &release, 80);
+
+    zassert_false(iqs9151_test_scroll_inertia_active(fixture->ctx),
+                  "Scroll inertia should stay off after a stale release");
 }
 
 ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_tail_two_to_one_to_zero_suppresses_cursor_path) {
