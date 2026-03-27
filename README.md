@@ -130,7 +130,7 @@ CONFIG_INPUT_IQS9151=y
 
 > [!TIP]
 > - 具体的な実装例は[ LaLapad Gen2のファームウェアリポジトリ](https://github.com/ShiniNet/zmk-config-LalaPadGen2)を参照してください。
-> - トラックパッドの機能や使い方については[LaLapag Genの使い方](https://github.com/ShiniNet/LaLaPadGen2/blob/main/guide/HowtoUse.md#%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%91%E3%83%83%E3%83%89%E3%81%AE%E6%A9%9F%E8%83%BD)を参考にしてください。
+> - トラックパッドの機能や使い方については[LaLapag Gen2の使い方](https://github.com/ShiniNet/LaLaPadGen2/blob/main/guide/HowtoUse.md#%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%91%E3%83%83%E3%83%89%E3%81%AE%E6%A9%9F%E8%83%BD)を参考にしてください。
 
 
 ## 対応環境
