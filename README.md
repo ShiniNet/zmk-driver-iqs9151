@@ -95,9 +95,26 @@ CONFIG_INPUT_IQS9151_LOG_LEVEL=3
 
 ※SDA/SCL/DRのプルアップ抵抗はトラックパッド側に4.7KΩ実装済みなので不要。  
 
-<img width="447" height="202" alt="image" src="https://github.com/user-attachments/assets/e2b8f28e-d779-4635-be67-05a65c6e2911" />
+<img width="1816" height="1334" alt="2026-03-27_16h37_57" src="https://github.com/user-attachments/assets/95b96d59-c3e7-432c-b41d-6f99093fd536" />
 
-### 5. 動作確認（デフォルト機能）
+> [!WARNING]
+> - 以下の画像の例はDTSの`irq-gpios`へGPIO0.02=D1に設定したときの配線例です。
+> - （DRに接続した白ワイヤーをXiaoBLEのD1に接続しています。）
+
+<img width="1083" height="600" alt="2026-03-27_15h43_31" src="https://github.com/user-attachments/assets/ba32499c-6387-4ba4-9f93-6c0c47308d7e" />
+
+### 5. トラックパッドの接続と組立
+
+- FFCにトラックパッドを接続します。
+- トラックパッドに厚さ1mm程度の任意のオーバーレイを貼り付けます。（アクリル板、プラ版、PLA、PETGなど。）
+
+> [!WARNING]
+> - FFCは青い面が手前側に見える向きに差し込んでください。
+> - トラックパッドにオーバーレイを取り付けない裸の状態で使用すると、センサー飽和を起こして正しく動作しません。
+
+<img width="1144" height="586" alt="2026-03-27_16h09_46" src="https://github.com/user-attachments/assets/63f06b36-9f48-481c-8e7e-c03caf2363a6" />
+
+### 6. 動作確認（デフォルト機能）
 
 - ビルド/書き込み後、1～2本指スワイプによるポインタ移動とスクロールを確認
 - 1～3本指タップによる左右中クリック、長押しによるプレスホールドを確認
