@@ -214,6 +214,23 @@ trackpad_key_behaviors_R: trackpad_key_behaviors_R {
 - 3本指スワイプを `MB4/MB5` 直出しではなく、レイヤー依存の挙動へつなげたい
 - トラックパッド入力を keymap / Keymap Editor / Studio と連携しやすい形へ変換したい
 
+### 本家 `zmk,input-processor-behaviors` との差分と注意点
+
+ZMK 本体には、よく似た `zmk,input-processor-behaviors` があります。  
+主な違いは、マッチ時の扱いです。
+
+- 本家 `behaviors`:
+  - Behavior を呼んだあと `ZMK_INPUT_PROC_STOP` を返して処理停止を狙う
+  - 元イベント自体は書き換えない
+- このモジュールの `behaviors-consume`:
+  - Behavior を呼んだあと、元イベントを無害化して `CONTINUE` する
+  - マウスボタン出力などが後段へそのまま流れにくい
+
+特に `layer override` 内では、本家 `behaviors` の `STOP` が listener 側でそのまま尊重されず、元の `INPUT_BTN_*` が後続処理まで流れてしまう場合があります。  
+その結果、置き換え先 Behavior と元のマウスボタンイベントが両方発火することがあります。
+
+`behaviors-consume` はこの問題を避けるため、停止ではなくイベント中和で抑制する前提の実装になっています。
+
 ### 4.2 `zmk,input-processor-dynamic-scaler`
 
 一致した `REL` イベントへ動的スケール倍率を掛ける Input Processor です。倍率は settings に保存され、電源再投入後も保持されます。
