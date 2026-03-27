@@ -18,7 +18,7 @@
 
 |名前|compatible|役割|
 | - | - | - |
-|`behaviors-consume`|`zmk,input-processor-behaviors-consume`|一致した入力イベントで Behavior を呼び出し、そのイベント自体は無効化する|
+|`behaviors-consume`|`zmk,input-processor-behaviors-consume`|一致した入力イベントで Behavior を呼び出し、その入力イベント自体は無効化する|
 |`dynamic-scaler`|`zmk,input-processor-dynamic-scaler`|`REL` 系イベントへ保持中のスケール倍率を適用する|
 
 ## 2. 全体像
