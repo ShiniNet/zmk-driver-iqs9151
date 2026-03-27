@@ -57,7 +57,7 @@ CONFIG_ZMK_POINTING_SMOOTH_SCROLLING=y
 CONFIG_INPUT_IQS9151=y
 ```
 
-必要に応じてトラックパッドの調整やジェスチャーONOFFや閾値の設定を追加してください（ConfigList.md参照）。
+必要に応じてトラックパッドの調整やジェスチャーONOFFや閾値の設定を追加してください（[ConfigList.md](https://github.com/ShiniNet/zmk-driver-iqs9151/blob/main/documents/iqs9151_kconfig_reference.md)参照）。
 
 ### 3. DTS(overlay) にIQS9151ノードを追加（Xiao BLE且つセントラル側の例）
 
