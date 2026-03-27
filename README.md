@@ -4,7 +4,7 @@
 トラックパッドによるカーソル移動/タップ/スクロール/ピンチインアウトや複数指ジェスチャなどの操作を扱えるようになります。  
 また、ZMKからトラックパッドの動作設定を行いやすくする為の拡張機能がいくつか追加されます。
 
-トラックパッドモジュールは[Booth（準備中）](https://shininet.booth.pm/)より入手可能です。  
+トラックパッドモジュール本体は[Booth（準備中）](https://shininet.booth.pm/)より入手可能です。  
 
 <img width="600"  alt="image" src="https://github.com/user-attachments/assets/76c1e221-bab2-4d7d-9250-408a9b767e39" />
 
@@ -103,7 +103,7 @@ CONFIG_INPUT_IQS9151_LOG_LEVEL=3
 
 <img width="1083" height="600" alt="2026-03-27_15h43_31" src="https://github.com/user-attachments/assets/ba32499c-6387-4ba4-9f93-6c0c47308d7e" />
 
-### 5. トラックパッドの接続と組立
+### 5. トラックパッドの接続と組立て
 
 - FFCにトラックパッドを接続します。
 - トラックパッドに厚さ1mm程度の任意のオーバーレイを貼り付けます。（アクリル板、プラ版、PLA、PETGなど。）
@@ -129,7 +129,9 @@ CONFIG_INPUT_IQS9151_LOG_LEVEL=3
 - キー入力によってトラックパッドのカーソル(スクロール)速度を動的に変更する
 - スプリットキーボード構成への組み込み。ダブルトラックパッド化
 
-実装例は `Lalapadv2` 関連リポジトリを参照してください。(準備中)
+> [!TIP]
+> - 具体的な実装例は[ LaLapad Gen2のファームウェアリポジトリ](https://github.com/ShiniNet/zmk-config-LalaPadGen2)を参照してください。
+> - トラックパッドの機能や使い方については[LaLapag Genの使い方](https://github.com/ShiniNet/LaLaPadGen2/blob/main/guide/HowtoUse.md#%E3%83%88%E3%83%A9%E3%83%83%E3%82%AF%E3%83%91%E3%83%83%E3%83%89%E3%81%AE%E6%A9%9F%E8%83%BD)を参考にしてください。
 
 
 ## 対応環境
