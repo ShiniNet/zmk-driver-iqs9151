@@ -97,7 +97,7 @@ CONFIG_INPUT_IQS9151=y
 <img width="1816" height="1334" alt="2026-03-27_16h37_57" src="https://github.com/user-attachments/assets/95b96d59-c3e7-432c-b41d-6f99093fd536" />
 
 > [!WARNING]
-> - 以下の画像の例はDTSの`irq-gpios`へGPIO0.02=D1に設定したときの配線例です。
+> - 以下の画像の例はDTSの`irq-gpios`へGPIO0.02=D0に設定したときの配線例です。
 > - （DRに接続した白ワイヤーをXiaoBLEのD1に接続しています。）
 
 <img width="1083" height="600" alt="2026-03-27_15h43_31" src="https://github.com/user-attachments/assets/ba32499c-6387-4ba4-9f93-6c0c47308d7e" />
