@@ -4,6 +4,9 @@
 - 本ドキュメントではmoNa2右手側のトラックボールは残しつつ、左手側のロータリーエンコーダーをトラックパッドに換装する方法を例示します。
 - 本ドキュメントではZMKのビルド手順など、基本的な解説は省略しています。
 
+![IMG_20260328_142403](https://github.com/user-attachments/assets/b126c955-8b99-423a-8c96-8f6632046878)
+
+
 ## moNa2のロータリーエンコーダーを取り外す
 
 <img width="1024" height="656" alt="2026-03-28_12h59_17" src="https://github.com/user-attachments/assets/dfb5ea6e-5524-4737-b1b7-7d198c763d27" />
@@ -11,7 +14,7 @@
 
 ## マイコンとブレークアウトボードを配線図に従って繋ぐ
 
-<img width="1061" height="1279" alt="2026-03-28_13h04_34" src="https://github.com/user-attachments/assets/cf80116f-213e-45b1-8a8f-b9e2cc02021b" />
+<img width="400" alt="2026-03-28_13h04_34" src="https://github.com/user-attachments/assets/cf80116f-213e-45b1-8a8f-b9e2cc02021b" />
 
 <img width="1364" height="768" alt="2026-03-28_13h05_04" src="https://github.com/user-attachments/assets/4325f1ed-6ac9-4a4c-bd48-980a10305c29" />
 
@@ -35,4 +38,10 @@
 > [!TIP]
 > - 自前のmoN2フォークへ組み込みたい場合、[コミットログ](https://github.com/ShiniNet/zmk-config-moNa2-v2_TP/commit/7e83a23ea202d5694ea33503b81cd67133515d6f)を参考に変更を取り込む。
 
-## 動作確認
+## 動作確認（デフォルト機能のみ）
+
+- ビルド/書き込み後、1～2本指スワイプによるポインタ移動とスクロールを確認
+- 1～3本指タップによる左右中クリック、タップドラッグを確認
+- 3本指左右スワイプによるマウスボタン4-5(進む戻る)の出力を確認
+
+※更なる動作をキーマップから設定できるようにするにはコンフィグ及びDTSの設定が必要です。  
