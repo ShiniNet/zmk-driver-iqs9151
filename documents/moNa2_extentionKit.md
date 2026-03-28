@@ -4,13 +4,18 @@
 - 本ドキュメントではmoNa2右手側のトラックボールは残しつつ、左手側のロータリーエンコーダーをトラックパッドに換装する方法を例示します。
 - 本ドキュメントではZMKのビルド手順など、基本的な解説は省略しています。
 
+- トラックパッドモジュール本体は[Boothで入手可能](https://shininet.booth.pm/)です。（準備中）
+- アダプターモジュール（3DP製）は[MakerWorldでデータ公開中](https://makerworld.com/ja/@ShiniNet/upload)です。（準備中）
+
 ![IMG_20260328_142403](https://github.com/user-attachments/assets/b126c955-8b99-423a-8c96-8f6632046878)
 
+<BR/><BR/>
 
 ## moNa2のロータリーエンコーダーを取り外す
 
 <img width="1024" height="656" alt="2026-03-28_12h59_17" src="https://github.com/user-attachments/assets/dfb5ea6e-5524-4737-b1b7-7d198c763d27" />
 
+<BR/><BR/>
 
 ## マイコンとブレークアウトボードを配線図に従って繋ぐ
 
@@ -18,10 +23,13 @@
 
 <img width="1364" height="768" alt="2026-03-28_13h05_04" src="https://github.com/user-attachments/assets/4325f1ed-6ac9-4a4c-bd48-980a10305c29" />
 
+<BR/><BR/>
+
 ## ブレークアウトボードを適当な両面テープ等でマイコンに固定する
 
 <img width="1546" height="612" alt="2026-03-28_13h06_03" src="https://github.com/user-attachments/assets/5b2d5b46-96d8-4b8f-9ca0-415f64dc7259" />
 
+<BR/><BR/>
 
 ## アダプターパーツ（3DP製）を使ってトラックパッドをmoNa2に固定する
 
@@ -29,6 +37,7 @@
 
 <img width="1547" height="789" alt="2026-03-28_13h09_55" src="https://github.com/user-attachments/assets/4253c42e-0e73-4162-aba6-892b91022766" />
 
+<BR/><BR/>
 
 ## ファームウェアをセットアップする
 
@@ -37,6 +46,8 @@
 
 > [!TIP]
 > - 自前のmoN2フォークへ組み込みたい場合、[コミットログ](https://github.com/ShiniNet/zmk-config-moNa2-v2_TP/commit/7e83a23ea202d5694ea33503b81cd67133515d6f)を参考に変更を取り込む。
+> - 
+<BR/><BR/>
 
 ## 動作確認（デフォルト機能のみ）
 
