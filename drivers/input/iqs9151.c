@@ -2114,7 +2114,7 @@ static void iqs9151_update_inertia_ema(struct iqs9151_data *data,
     int32_t seed_vy_fp;
 
     /* Cancel Inertial */
-    if (two_result->scroll_started || frame->finger_count == 2U) {
+    if (two_result->scroll_started || frame->finger_count == 2U || finger1_started) {
         iqs9151_ema_reset(&data->scroll_ema_x_fp, &data->scroll_ema_y_fp);
         iqs9151_inertia_cancel(&data->inertia_scroll, &data->inertia_scroll_work);
     }

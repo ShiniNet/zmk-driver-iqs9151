@@ -5,3 +5,4 @@ tests:
       - input
     platform_allow:
       - native_sim
+      - native_sim_64

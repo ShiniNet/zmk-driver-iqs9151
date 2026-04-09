@@ -155,9 +155,13 @@
       `<= CONFIG_INPUT_IQS9151_SCROLL_INERTIA_STALE_GAP_MS`
       かつ平均速度/サンプル数条件を満たす場合のみ発動する
     - release 前に停止して stale gap を超えた場合は発動しない
+    - scroll inertia 動作中に、新規 1F 接触 (`0->1`) が始まった場合は
+      scroll inertia を停止する
   - 終端が `2->1->0` になった場合でも、残り1指は 1Fカーソルへフォールバックさせない
     - 尾部の `finger_count==1` では `REL_X/Y` を送出しない
     - 尾部の `finger_count==1` / `1->0` では cursor inertia の seed/start を行わない
+    - 尾部の `2->1` は新規 1F 接触 (`0->1`) とは扱わず、
+      この tail だけを理由に scroll inertia は停止しない
     - 抑止は全指離し (`finger_count==0`) まで維持する
 - 2F Pinch:
   - 開始: `mode==NONE` かつ
@@ -286,3 +290,6 @@
   - 1F cursor inertia は release 直前の短時間窓に十分な速度と方向の持続がある場合のみ発動
   - 指を停止したまま release した場合は stale gap により inertia を抑止
   - 2F scroll inertia も同様に recent-window / stale-gap 判定へ更新
+- 2026-04-09: 2F scroll inertia の停止条件に新規 1F 接触 (`0->1`) を追加
+  - scroll inertia 動作中に新しい 1F タッチが始まった場合は inertia を停止する
+  - 既存の `2->1->0` tail 抑止仕様とは独立で、tail の `2->1` は停止条件に含めない

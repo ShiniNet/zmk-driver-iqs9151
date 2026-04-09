@@ -237,6 +237,43 @@ ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_release_after_stale_gap_does_not
                   "Scroll inertia should stay off after a stale release");
 }
 
+ZTEST_F(iqs9151_work_cb, test_new_one_finger_touch_cancels_scroll_inertia) {
+    const struct iqs9151_test_frame two_start =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 100, 100, 200, 100);
+    const struct iqs9151_test_frame two_scroll =
+        make_frame(2U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_FINGER2_CONFIDENCE | 2U,
+                   0, 0, 0, 160, 100, 260, 100);
+    const struct iqs9151_test_frame release =
+        make_frame(0U, 0U, 0, 0, 0, 0, 0, 0, 0);
+    const struct iqs9151_test_frame one_start =
+        make_frame(1U,
+                   IQS9151_TP_FINGER1_CONFIDENCE | IQS9151_TP_MOVEMENT_DETECTED | 1U,
+                   18, 0, 0, 120, 100, 0, 0);
+
+    iqs9151_test_process_frame(fixture->ctx, &two_start, 0);
+    iqs9151_test_process_frame(fixture->ctx, &two_scroll, 10);
+    iqs9151_test_process_frame(fixture->ctx, &release, 20);
+
+    zassert_true(iqs9151_test_scroll_inertia_active(fixture->ctx),
+                 "Scroll inertia should start on 2F scroll release");
+
+    iqs9151_test_process_frame(fixture->ctx, &one_start, 30);
+
+    zassert_false(iqs9151_test_scroll_inertia_active(fixture->ctx),
+                  "A new 1F touch should cancel scroll inertia");
+    zassert_equal(fixture->log.count, 3U,
+                  "Expected one scroll REL event plus one 1F cursor frame");
+    zassert_equal(fixture->log.events[1].type, IQS9151_TEST_EVENT_REL, "Event[1] not REL");
+    zassert_equal(fixture->log.events[1].code, INPUT_REL_X, "Event[1] should be REL_X");
+    zassert_equal(fixture->log.events[1].value, 18, "Event[1] unexpected REL_X value");
+    zassert_equal(fixture->log.events[2].type, IQS9151_TEST_EVENT_REL, "Event[2] not REL");
+    zassert_equal(fixture->log.events[2].code, INPUT_REL_Y, "Event[2] should be REL_Y");
+    zassert_equal(fixture->log.events[2].value, 0, "Event[2] unexpected REL_Y value");
+}
+
 ZTEST_F(iqs9151_work_cb, test_two_finger_scroll_tail_two_to_one_to_zero_suppresses_cursor_path) {
     const struct iqs9151_test_frame two_start =
         make_frame(2U,
