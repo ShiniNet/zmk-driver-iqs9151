@@ -98,7 +98,7 @@ CONFIG_INPUT_IQS9151=y
 
 > [!WARNING]
 > - 以下の画像の例はDTSの`irq-gpios`へGPIO0.02=D0に設定したときの配線例です。
-> - （DRに接続した白ワイヤーをXiaoBLEのD1に接続しています。）
+> - （DRに接続した白ワイヤーをXiaoBLEのD0に接続しています。）
 
 <img width="1083" height="600" alt="2026-03-27_15h43_31" src="https://github.com/user-attachments/assets/ba32499c-6387-4ba4-9f93-6c0c47308d7e" />
 
@@ -109,6 +109,7 @@ CONFIG_INPUT_IQS9151=y
 
 > [!WARNING]
 > - FFCは青い面が手前側に見える向きに差し込んでください。
+> - 付属のブレークアウトボードを使用する場合、FFCは6PINの接点が反転しているタイプを使用してください。
 > - トラックパッドにオーバーレイを取り付けない裸の状態で使用すると、センサー飽和を起こして正しく動作しません。
 
 <img width="1144" height="586" alt="2026-03-27_16h09_46" src="https://github.com/user-attachments/assets/63f06b36-9f48-481c-8e7e-c03caf2363a6" />
